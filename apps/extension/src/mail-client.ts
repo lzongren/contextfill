@@ -14,15 +14,25 @@ const providerStatusSchema = z
     configured: z.boolean(),
     connected: z.boolean(),
     account: z.string().nullable(),
-    sessionOnly: z.literal(true),
+    sessionOnly: z.boolean(),
+    credentialStorage: z.enum(['os-keychain', 'session']),
   })
   .strict();
 
 const statusResponseSchema = z.object({ providers: z.array(providerStatusSchema) }).strict();
 const messagesResponseSchema = z.object({ messages: z.array(mailboxMessageSchema) }).strict();
 const connectResponseSchema = z.object({ authorizationUrl: z.string().url() }).strict();
+const pairingStatusSchema = z
+  .object({
+    mode: z.enum(['unpaired', 'paired', 'legacy-env']),
+    authenticated: z.boolean(),
+    persistent: z.boolean(),
+  })
+  .strict();
+const pairingResponseSchema = z.object({ pairing: pairingStatusSchema }).strict();
 
 export type MailProviderStatus = z.infer<typeof providerStatusSchema>;
+export type PairingStatus = z.infer<typeof pairingStatusSchema>;
 
 export class MailClientError extends Error {
   constructor(
@@ -37,9 +47,11 @@ async function serviceRequest(path: string, init?: RequestInit): Promise<unknown
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 4_000);
   try {
+    const headers = await companionServiceHeaders(init?.headers);
     const response = await fetch(`${serviceBase}${path}`, {
       ...init,
       cache: 'no-store',
+      headers,
       signal: controller.signal,
     });
     const body = (await response.json().catch(() => ({}))) as {
@@ -64,6 +76,29 @@ async function serviceRequest(path: string, init?: RequestInit): Promise<unknown
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function companionServiceHeaders(initial?: HeadersInit): Promise<Headers> {
+  const headers = new Headers(initial);
+  if (typeof chrome === 'undefined' || !chrome.runtime?.id) return headers;
+  headers.set('x-contextfill-extension-id', chrome.runtime.id);
+  const secret = await loadPairingSecret();
+  if (secret) headers.set('x-contextfill-pairing', secret);
+  return headers;
+}
+
+export async function getPairingStatus(): Promise<PairingStatus> {
+  return pairingResponseSchema.parse(await serviceRequest('/pair/status')).pairing;
+}
+
+export async function pairCompanionService(code: string): Promise<void> {
+  const secret = pairingSecret();
+  await serviceRequest('/pair', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code, secret }),
+  });
+  await chrome.storage.local.set({ pairingSecret: secret });
 }
 
 export async function getMailProviderStatus(): Promise<MailProviderStatus[]> {
@@ -101,6 +136,18 @@ export async function loadRealMailModelOptIn(): Promise<boolean> {
 
 export async function saveRealMailModelOptIn(enabled: boolean): Promise<void> {
   await chrome.storage.local.set({ realMailModelOptIn: enabled });
+}
+
+async function loadPairingSecret(): Promise<string | null> {
+  const stored = await chrome.storage.local.get('pairingSecret');
+  return typeof stored.pairingSecret === 'string' ? stored.pairingSecret : null;
+}
+
+function pairingSecret(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 export function sourceLabel(source: MailSource): string {

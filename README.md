@@ -42,7 +42,7 @@ Then:
 
 No email account, cloud setup, personal data, paid service, or OpenAI API key is required. See [Judge testing](docs/JUDGE_TESTING.md) for every fixture and expected result.
 
-For real use, ContextFill can connect to Gmail or Outlook through its loopback companion service. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for least-privilege OAuth setup, current security boundaries, and provider limitations.
+For real use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for installation, least-privilege OAuth setup, current security boundaries, and provider limitations.
 
 ## Architecture
 
@@ -105,9 +105,10 @@ The MV3 manifest requests:
 
 - `activeTab` for temporary access after the user invokes the extension.
 - `scripting` for on-demand main-frame injection.
+- `storage` for the selected source, explicit model opt-in, and random companion-service pairing capability. Message content, codes, and OAuth tokens are never stored there.
 - A single host permission, `http://127.0.0.1:4318/*`, for the optional loopback extractor.
 
-It does **not** request `<all_urls>`, browsing history, clipboard, tabs, storage, email, password, or form-submission privileges. Chrome documents `activeTab` as temporary access granted by an explicit extension gesture, and supports pairing it with `scripting.executeScript()` ([activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab), [scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)).
+It does **not** request `<all_urls>`, browsing history, clipboard, tabs, password, or form-submission privileges. Chrome documents `activeTab` as temporary access granted by an explicit extension gesture, and supports pairing it with `scripting.executeScript()` ([activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab), [scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)).
 
 ## Optional GPT-5.6 extraction
 
@@ -119,7 +120,7 @@ cp .env.example .env
 npm run service
 ```
 
-Leave `npm run demo` running in another terminal and reopen ContextFill. The popup will say **GPT-5.6 extracted message facts · deterministic policy decided** when a validated model candidate is selected.
+Pair the extension with the terminal code from `npm run service`, leave `npm run demo` running in another terminal, and reopen ContextFill. The popup will say **GPT-5.6 extracted message facts · deterministic policy decided** when a validated model candidate is selected.
 
 The local service:
 
@@ -145,7 +146,7 @@ npm run check           # Fast iteration gate: format, lint, types, unit/integra
 npm run test:extension  # Load packaged MV3 extension in Chromium
 npm run test:browser    # Run real-Chrome page acceptance tests
 npm run build           # Production demo, extension, and service builds
-npm run package         # Build and create the extension ZIP
+npm run package         # Build extension ZIP and installable companion .tgz
 npm run verify          # Format, lint, types, tests, builds, extension load, browser tests
 ```
 
@@ -155,9 +156,9 @@ The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 
 Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
 
-Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.1`) runs the complete `npm run verify` release gate, packages the extension, records the ZIP and SHA-256 file as workflow artifacts, and publishes both files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.2`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
-Download the latest verified extension package and its checksum from [GitHub Releases](https://github.com/lzongren/contextfill/releases/latest).
+Download verified extension packages and their checksums from [GitHub Releases](https://github.com/lzongren/contextfill/releases).
 
 ## Security and sensitive-data behavior
 
@@ -168,7 +169,7 @@ Download the latest verified extension package and its checksum from [GitHub Rel
 - Values are masked by default. Blocked candidates cannot be revealed.
 - Normal application code never logs a full code.
 - The extension never touches the clipboard or analytics.
-- Candidate/message data is not written to extension storage.
+- Candidate/message data is not written to extension storage. The stored loopback capability is restricted to trusted extension contexts.
 - User and model text enter the popup through `textContent`, not executable HTML.
 - Field mutation dispatches `input` and `change` events but never clicks or submits anything.
 - The local service rejects non-loopback/non-extension origins and oversized input.
@@ -188,12 +189,12 @@ The popup and judge lab use semantic labels, keyboard-operable native controls, 
 ## Honest limitations
 
 - This is a hackathon prototype, not phishing-proof or production-ready.
-- Gmail and Outlook require a locally configured OAuth application and running companion service. Tokens are session-only until OS-keychain persistence is implemented.
+- Gmail and Outlook require a locally configured OAuth application and running companion service. Refresh tokens use the native OS keychain; if it is unavailable, the UI explicitly reports session-only authorization.
 - Sender addresses are evidence, not cryptographic proof of email authentication.
 - Lookalike detection covers exact registrable-domain mismatch plus a controlled set of Unicode, punycode, substitution, hyphen, and deceptive-label signals. It does not detect every homograph.
 - Field detection does not traverse iframes or closed shadow roots and cannot support every framework-controlled input.
 - Replay state is in a Manifest V3 service worker and may reset after browser/extension restart.
-- Loopback HTTP is suitable for a local demo; a production design would require authenticated transport and stronger origin binding.
+- Loopback requests require a one-time paired 256-bit capability plus the extension installation ID. Local malware or another process running as the user remains outside this boundary.
 - The GPT-5.6 live path requires the user's own API access and incurs normal API usage. The repository's model tests use injected responses; no live API call was made during the no-key release verification.
 
 ## How Codex was used

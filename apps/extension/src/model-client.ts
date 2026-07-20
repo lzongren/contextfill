@@ -4,6 +4,7 @@ import {
   type SyntheticMessage,
   type VerificationCandidate,
 } from '../../../packages/core/src/index.js';
+import { companionServiceHeaders } from './mail-client.js';
 
 export type ExtractionBatch = {
   candidates: VerificationCandidate[];
@@ -22,7 +23,7 @@ export async function requestModelCandidate(
   try {
     const response = await fetcher('http://127.0.0.1:4318/extract', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: await companionServiceHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({ message }),
       signal: controller.signal,
     });

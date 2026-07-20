@@ -11,6 +11,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 - The user's explicit consent to reveal or fill.
 - The optional OpenAI API key.
 - Gmail and Microsoft OAuth access and refresh tokens.
+- The per-install loopback pairing capability.
 - Integrity of the deterministic policy and replay state.
 - Privacy of inbox and browsing context.
 
@@ -19,11 +20,12 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 1. **Webpage → isolated content script:** the page DOM, labels, metadata, and fields are untrusted. Only localhost may provide a simulated hostname.
 2. **Mailbox provider or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, and any instructions in a message are untrusted data.
 3. **Extension popup → content script:** only an explicit popup action carries a value to a currently detected field.
-4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require the exact configured extension origin.
-5. **Loopback service → Gmail/Microsoft APIs:** PKCE OAuth tokens remain in service memory; only bounded recent-message queries are made with delegated read-only scopes.
-6. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
-7. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
-8. **Policy → mutation:** an allow decision, or an acknowledged warn decision, is required before filling. Block cannot be overridden.
+4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require a paired capability and matching extension installation ID; browser `Origin` is cross-checked when present.
+5. **Loopback service → OS credential manager:** refresh tokens and the hashed pairing record persist through the native platform keychain; access tokens remain in memory.
+6. **Loopback service → Gmail/Microsoft APIs:** only bounded recent-message queries are made with delegated read-only scopes.
+7. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
+8. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
+9. **Policy → mutation:** an allow decision, or an acknowledged warn decision, is required before filling. Block cannot be overridden.
 
 ## Threats and mitigations
 
@@ -87,17 +89,17 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 
 **Threat:** A local attacker steals a refresh token, a connector requests write access, or an API response causes broad mailbox disclosure.
 
-**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. Tokens remain in service memory and clear on restart. Gmail searches one day of verification-like mail and retrieves at most 12 bodies; Outlook filters 25 recent messages to at most 10 verification-like results. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
+**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail searches one day of verification-like mail and retrieves at most 12 bodies; Outlook filters 25 recent messages to at most 10 verification-like results. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
 
-**Residual risk:** Local malware can inspect process memory. Gmail's scope still permits broad read access and requires provider review for public distribution. OS-keychain-backed refresh-token persistence, provider audit verification, and per-install service authentication remain required before general release.
+**Residual risk:** Local malware running as the user can inspect process memory or invoke the same credential APIs. Gmail's scope still permits broad read access and requires provider review for public distribution. Live provider audit verification remains required before general release.
 
 ### Sensitive logs, clipboard, storage, and analytics
 
 **Threat:** A full code leaks through console output, clipboard, persistent extension storage, telemetry, or screenshots.
 
-**Mitigations:** Production code does not log codes, never touches the clipboard, and has no analytics. Extension storage contains only the selected source name; codes, message bodies, and OAuth tokens are excluded. Values are masked by default, cannot be revealed on blocks, and clear from popup state after fill/dismiss/expiry/90 seconds. OAuth tokens remain in companion-service memory only.
+**Mitigations:** Production code does not log codes, never touches the clipboard, and has no analytics. Extension storage contains only the selected source, model opt-in, and random pairing capability; access is restricted to trusted extension contexts. Codes, message bodies, and OAuth tokens are excluded. Values are masked by default, cannot be revealed on blocks, and clear from popup state after fill/dismiss/expiry/90 seconds. Refresh tokens and only the hash of the pairing capability use the OS keychain.
 
-**Residual risk:** A user can intentionally reveal or photograph a code. Browser developer tooling can inspect extension memory while it is active.
+**Residual risk:** A user can intentionally reveal or photograph a code. Browser developer tooling or local profile access can expose extension memory and its pairing capability.
 
 ### Overbroad browser permissions
 
@@ -119,9 +121,9 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 
 **Threat:** A malicious website calls the local service to spend API quota or exfiltrate message content.
 
-**Mitigations:** The server binds to `127.0.0.1`, uses no cookies, sets `no-store`, rejects model payloads above 12 KB, truncates model content to 4,000 characters, and exposes no arbitrary URL fetch. Mail status, connection, disconnection, and message endpoints require the exact extension ID configured in the local environment; OAuth callbacks require one-time random state.
+**Mitigations:** The server binds to `127.0.0.1`, uses no cookies, sets `no-store`, rejects model payloads above 12 KB, truncates model content to 4,000 characters, and exposes no arbitrary URL fetch. Mailbox and model-extraction endpoints require a random 256-bit capability bound to the extension installation ID. The one-time six-digit bootstrap code expires after 10 minutes and rate-limits after five failures. Only a SHA-256 capability hash reaches the service keychain. OAuth callbacks separately require one-time random state.
 
-**Residual risk:** Exact extension origin is stronger than a generic CORS allowlist but is not a secret. Production still needs a per-install capability token, HTTPS-equivalent secure local transport, tighter rate limits, and request accounting.
+**Residual risk:** A local process running as the user can call loopback directly and may be able to inspect browser profile storage. Pairing authenticates the intended browser client against ordinary web-origin requests; it is not a sandbox against local malware. Request accounting and packaged-service integrity remain future hardening.
 
 ### Automatic submission or unintended page mutation
 
@@ -142,7 +144,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 - Claiming phishing-proof, complete homograph detection, or production readiness.
 - Verifying mailbox transport authentication or sender account integrity.
 - Hosted multi-user mailbox service or server-side storage of user mail.
-- Persistent OAuth tokens before OS-keychain storage and per-install pairing are implemented.
+- Hosted synchronization of OAuth credentials or mailbox content.
 - Password capture, password-manager behavior, clipboard management, or automatic navigation.
 - Iframe, cross-origin frame, or closed shadow-root field support.
 - Magic-link opening, order references, or booking references in the P0/P1 release.

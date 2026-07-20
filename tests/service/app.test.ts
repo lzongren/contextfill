@@ -19,11 +19,15 @@ afterEach(() => {
 describe('local extraction service', () => {
   it('reports no-key mode without exposing a secret', async () => {
     delete process.env.OPENAI_API_KEY;
+    process.env.CONTEXTFILL_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
     const response = await createServiceApp().request('/health');
     expect(await response.json()).toEqual({ ok: true, model: 'gpt-5.6', configured: false });
     const extractResponse = await createServiceApp().request('/extract', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+      },
       body: JSON.stringify({ message }),
     });
     expect(extractResponse.status).toBe(503);
@@ -31,6 +35,7 @@ describe('local extraction service', () => {
   });
 
   it('returns a candidate from an injected extractor', async () => {
+    process.env.CONTEXTFILL_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
     const candidate = {
       ...extractDeterministic(message)!,
       id: 'candidate:northstar-current',
@@ -51,6 +56,7 @@ describe('local extraction service', () => {
   });
 
   it('rejects cross-origin and oversized requests', async () => {
+    process.env.CONTEXTFILL_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
     const extractor = vi.fn(async () => extractDeterministic(message)!);
     const forbidden = await createServiceApp(extractor).request('/extract', {
       method: 'POST',
@@ -60,22 +66,27 @@ describe('local extraction service', () => {
     expect(forbidden.status).toBe(403);
     const oversized = await createServiceApp(extractor).request('/extract', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'content-length': '13000' },
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '13000',
+        origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
+      },
       body: '{}',
     });
     expect(oversized.status).toBe(413);
   });
 
-  it('exposes normalized mailbox data only to the configured extension origin', async () => {
+  it('exposes normalized mailbox data only to the authenticated extension origin', async () => {
     process.env.CONTEXTFILL_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
     const mailbox: MailboxManagerLike = {
-      statuses: () => [
+      statuses: async () => [
         {
           provider: 'gmail',
           configured: true,
           connected: true,
           account: 'person@gmail.example',
-          sessionOnly: true,
+          sessionOnly: false,
+          credentialStorage: 'os-keychain',
         },
       ],
       beginConnection: vi.fn(async () => 'https://accounts.example/authorize'),
@@ -96,7 +107,7 @@ describe('local extraction service', () => {
     const otherExtension = await app.request('/mail/messages/gmail', {
       headers: { origin: 'chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba' },
     });
-    expect(otherExtension.status).toBe(403);
+    expect(otherExtension.status).toBe(401);
   });
 });
 

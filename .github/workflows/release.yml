@@ -47,6 +47,7 @@ jobs:
           fi
           echo "PACKAGE_VERSION=${package_version}" >> "$GITHUB_ENV"
           echo "ARTIFACT_NAME=contextfill-extension-v${package_version}.zip" >> "$GITHUB_ENV"
+          echo "COMPANION_ARTIFACT_NAME=contextfill-companion-v${package_version}.tgz" >> "$GITHUB_ENV"
 
       - name: Use Node.js 22
         uses: actions/setup-node@v7
@@ -63,20 +64,27 @@ jobs:
       - name: Verify release candidate
         run: npm run verify
 
-      - name: Package extension
+      - name: Package extension and companion service
         run: npm run package
 
-      - name: Create checksum
+      - name: Smoke-test installed companion package
+        run: npm run test:package
+
+      - name: Create checksums
         working-directory: artifacts
-        run: sha256sum "$ARTIFACT_NAME" > "${ARTIFACT_NAME}.sha256"
+        run: |
+          sha256sum "$ARTIFACT_NAME" > "${ARTIFACT_NAME}.sha256"
+          sha256sum "$COMPANION_ARTIFACT_NAME" > "${COMPANION_ARTIFACT_NAME}.sha256"
 
       - name: Preserve workflow artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: contextfill-extension-${{ env.PACKAGE_VERSION }}
+          name: contextfill-release-${{ env.PACKAGE_VERSION }}
           path: |
             artifacts/${{ env.ARTIFACT_NAME }}
             artifacts/${{ env.ARTIFACT_NAME }}.sha256
+            artifacts/${{ env.COMPANION_ARTIFACT_NAME }}
+            artifacts/${{ env.COMPANION_ARTIFACT_NAME }}.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -89,6 +97,8 @@ jobs:
             gh release upload "$RELEASE_TAG" \
               "artifacts/${ARTIFACT_NAME}" \
               "artifacts/${ARTIFACT_NAME}.sha256" \
+              "artifacts/${COMPANION_ARTIFACT_NAME}" \
+              "artifacts/${COMPANION_ARTIFACT_NAME}.sha256" \
               --clobber
           else
             prerelease_args=()
@@ -98,6 +108,8 @@ jobs:
             gh release create "$RELEASE_TAG" \
               "artifacts/${ARTIFACT_NAME}" \
               "artifacts/${ARTIFACT_NAME}.sha256" \
+              "artifacts/${COMPANION_ARTIFACT_NAME}" \
+              "artifacts/${COMPANION_ARTIFACT_NAME}.sha256" \
               --verify-tag \
               --generate-notes \
               "${prerelease_args[@]}" \

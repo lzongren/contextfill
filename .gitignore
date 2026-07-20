@@ -7,5 +7,7 @@ test-results/
 .env.*
 !.env.example
 artifacts/*.zip
+artifacts/*.tgz
+artifacts/*.sha256
 .DS_Store
 *.log

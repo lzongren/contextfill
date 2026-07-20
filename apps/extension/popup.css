@@ -283,6 +283,23 @@ input:focus-visible {
   gap: 8px;
 }
 
+.pairing-input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #aeb8ac;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #ffffff;
+  color: #10231f;
+  font: inherit;
+  letter-spacing: 0.08em;
+}
+
+.pairing-input:focus-visible {
+  outline: 3px solid #7aaa27;
+  outline-offset: 2px;
+}
+
 .source-card__actions .button {
   min-height: 34px;
 }

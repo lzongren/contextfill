@@ -92,7 +92,7 @@ Browser behavior also reinforced that “obvious” field heuristics conflict in
 - Add authenticated, rate-limited local transport.
 - Improve Unicode script and brand-risk analysis without overstating coverage.
 - Support open shadow roots and carefully scoped iframe workflows.
-- Add OS-keychain token persistence, per-install loopback pairing, and live provider conformance tests before general mailbox distribution.
+- Complete live user-owned Gmail and Outlook conformance runs and provider review before general mailbox distribution.
 - Explore other temporary information, such as magic links and booking references, while retaining explicit context checks.
 
 ## Judge testing

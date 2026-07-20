@@ -13,12 +13,16 @@ import {
   disconnectMailProvider,
   fetchMailboxMessages,
   getMailProviderStatus,
+  getPairingStatus,
   loadMailSource,
   loadRealMailModelOptIn,
   MailClientError,
+  pairCompanionService,
   saveMailSource,
   saveRealMailModelOptIn,
   sourceLabel,
+  type MailProviderStatus,
+  type PairingStatus,
   type MailProvider,
   type MailSource,
 } from './mail-client.js';
@@ -269,6 +273,102 @@ function sourceCard(
   return { card, actions };
 }
 
+function appendPairingCard(body: HTMLElement, status: PairingStatus): void {
+  const copy =
+    status.mode === 'paired'
+      ? 'This service is paired with another installation or its browser capability was lost. Restart once with CONTEXTFILL_PAIRING_RESET=1 to create a new code.'
+      : status.mode === 'legacy-env'
+        ? 'The extension ID in CONTEXTFILL_EXTENSION_ID does not match this installation. Remove it to use one-time pairing.'
+        : 'Enter the six-digit pairing code printed by npm run service. The code expires after 10 minutes.';
+  const pairing = sourceCard('Companion service', 'Pairing required', copy);
+  if (status.mode === 'unpaired') {
+    const code = element('input', 'pairing-input');
+    code.type = 'text';
+    code.inputMode = 'numeric';
+    code.pattern = '[0-9]*';
+    code.maxLength = 6;
+    code.autocomplete = 'one-time-code';
+    code.placeholder = '6-digit code';
+    code.setAttribute('aria-label', 'Companion service pairing code');
+    const pair = sourceAction('Pair service', true);
+    pair.addEventListener('click', () => {
+      void (async () => {
+        try {
+          await pairCompanionService(code.value.trim());
+          await renderMailSources();
+        } catch (error) {
+          renderMessage(
+            'error',
+            'Could not pair companion service',
+            error instanceof Error ? error.message : 'Check the terminal code and try again.',
+          );
+        }
+      })();
+    });
+    pairing.actions.append(code, pair);
+  }
+  body.append(pairing.card);
+}
+
+function appendProviderCards(body: HTMLElement, statuses: MailProviderStatus[]): void {
+  for (const status of statuses) {
+    const label = sourceLabel(status.provider);
+    const state = status.connected
+      ? mailSource === status.provider
+        ? 'Using'
+        : 'Connected'
+      : status.configured
+        ? 'Ready to connect'
+        : 'Needs setup';
+    const copy = status.connected
+      ? `Connected${status.account ? ` as ${status.account}` : ''}. ${
+          status.sessionOnly
+            ? 'Authorization lasts only while the companion service is running.'
+            : 'Refresh authorization is protected by your OS keychain.'
+        }`
+      : status.configured
+        ? `Connect ${label} with read-only mail access. ContextFill fetches only recent verification-like messages.`
+        : `Add the ${label} OAuth client settings to .env, then restart the companion service.`;
+    const providerCard = sourceCard(label, state, copy);
+    if (status.connected) {
+      const use = sourceAction(
+        mailSource === status.provider ? `Using ${label}` : `Use ${label}`,
+        mailSource !== status.provider,
+      );
+      use.disabled = mailSource === status.provider;
+      use.addEventListener('click', () => void chooseSource(status.provider));
+      const disconnect = sourceAction('Disconnect');
+      disconnect.addEventListener('click', () => {
+        void (async () => {
+          try {
+            await disconnectMailProvider(status.provider);
+            if (mailSource === status.provider) {
+              mailSource = 'synthetic';
+              await saveMailSource('synthetic');
+            }
+            await renderMailSources();
+          } catch (error) {
+            renderMessage(
+              'error',
+              `Could not disconnect ${label}`,
+              error instanceof Error
+                ? error.message
+                : 'The saved mailbox credential could not be removed.',
+            );
+          }
+        })();
+      });
+      providerCard.actions.append(use, disconnect);
+    } else {
+      const connect = sourceAction(`Connect ${label}`, true);
+      connect.disabled = !status.configured;
+      connect.addEventListener('click', () => void connectProvider(status.provider));
+      providerCard.actions.append(connect);
+    }
+    body.append(providerCard.card);
+  }
+}
+
 async function chooseSource(source: MailSource): Promise<void> {
   mailSource = source;
   await saveMailSource(source);
@@ -322,48 +422,19 @@ async function renderMailSources(): Promise<void> {
   body.append(demo.card);
 
   try {
-    const statuses = await getMailProviderStatus();
-    for (const status of statuses) {
-      const label = sourceLabel(status.provider);
-      const state = status.connected
-        ? mailSource === status.provider
-          ? 'Using'
-          : 'Connected'
-        : status.configured
-          ? 'Ready to connect'
-          : 'Needs setup';
-      const copy = status.connected
-        ? `Connected${status.account ? ` as ${status.account}` : ''}. Authorization is held only while the companion service is running.`
-        : status.configured
-          ? `Connect ${label} with read-only mail access. ContextFill fetches only recent verification-like messages.`
-          : `Add the ${label} OAuth client settings to .env, then restart the companion service.`;
-      const providerCard = sourceCard(label, state, copy);
-      if (status.connected) {
-        const use = sourceAction(
-          mailSource === status.provider ? `Using ${label}` : `Use ${label}`,
-          mailSource !== status.provider,
+    const pairing = await getPairingStatus();
+    if (!pairing.authenticated) {
+      appendPairingCard(body, pairing);
+    } else {
+      if (pairing.mode === 'paired' && !pairing.persistent) {
+        const warning = sourceCard(
+          'Companion pairing',
+          'Session-only',
+          'The OS keychain is unavailable. Pairing and mailbox authorization will be lost when the service stops.',
         );
-        use.disabled = mailSource === status.provider;
-        use.addEventListener('click', () => void chooseSource(status.provider));
-        const disconnect = sourceAction('Disconnect');
-        disconnect.addEventListener('click', () => {
-          void (async () => {
-            await disconnectMailProvider(status.provider);
-            if (mailSource === status.provider) {
-              mailSource = 'synthetic';
-              await saveMailSource('synthetic');
-            }
-            await renderMailSources();
-          })();
-        });
-        providerCard.actions.append(use, disconnect);
-      } else {
-        const connect = sourceAction(`Connect ${label}`, true);
-        connect.disabled = !status.configured;
-        connect.addEventListener('click', () => void connectProvider(status.provider));
-        providerCard.actions.append(connect);
+        body.append(warning.card);
       }
-      body.append(providerCard.card);
+      appendProviderCards(body, await getMailProviderStatus());
     }
   } catch (error) {
     const unavailable = sourceCard(

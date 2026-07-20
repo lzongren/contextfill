@@ -1,5 +1,7 @@
 import type { BackgroundRequest, BackgroundResponse } from './shared/messages.js';
 
+void chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+
 const usedCandidates = new Map<string, number>();
 const USED_TTL_MS = 15 * 60_000;
 
