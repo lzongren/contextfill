@@ -154,6 +154,8 @@ Every pull request and push to `main` runs the required `verify` status using th
 
 Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.1.0`) runs the complete `npm run verify` release gate, packages the extension, records the ZIP and SHA-256 file as workflow artifacts, and publishes both files to the matching GitHub Release. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
+Download the latest verified extension package and its checksum from [GitHub Releases](https://github.com/lzongren/contextfill/releases/latest).
+
 ## Security and sensitive-data behavior
 
 - Codes exist only in synthetic fixture source and short-lived popup variables.

@@ -25,5 +25,5 @@ No `OPENAI_API_KEY` was configured during release verification, so a real paid R
 
 - Path: `artifacts/contextfill-extension-v0.1.0.zip`
 - Size on disk: approximately 120 KB
-- SHA-256: `bbb516757211eb2991ec967b347d7145dfe7276f1080ac484c6e4c7e5dca4ca0`
+- SHA-256: use the checksum attached to the [verified v0.1.0 GitHub Release](https://github.com/lzongren/contextfill/releases/tag/v0.1.0)
 - ZIP contents: root-level `manifest.json`, popup HTML/CSS/JS, content script, and background worker
