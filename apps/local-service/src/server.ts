@@ -3,7 +3,7 @@ import { serve } from '@hono/node-server';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServiceApp } from './app.js';
-import { helpText, initializeConfig } from './cli.js';
+import { helpText, initializeConfig, inspectCompanionReadiness } from './cli.js';
 import { createMailboxManager } from './mailbox.js';
 import { createPairingManager } from './pairing.js';
 
@@ -23,6 +23,10 @@ function isEntrypoint(): boolean {
 if (isEntrypoint()) {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(helpText);
+  } else if (process.argv.includes('--doctor')) {
+    const report = await inspectCompanionReadiness();
+    console.log(report.text);
+    if (!report.ok) process.exitCode = 1;
   } else if (process.argv.includes('--init')) {
     try {
       const output = await initializeConfig();

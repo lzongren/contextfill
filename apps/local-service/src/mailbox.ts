@@ -37,6 +37,21 @@ type OAuthConfig = {
   scopes: string[];
 };
 
+export type MailboxProviderSetup = {
+  provider: MailProvider;
+  configured: boolean;
+  missing: string[];
+  redirectUri: string;
+  scopes: string[];
+  registrationType: 'web-application' | 'public-client';
+};
+
+export type MailboxSetup = {
+  servicePort: number;
+  redirectOrigin: string;
+  providers: MailboxProviderSetup[];
+};
+
 type PendingAuthorization = {
   provider: MailProvider;
   verifier: string;
@@ -146,11 +161,71 @@ function codeChallenge(verifier: string): string {
 }
 
 function safeOrigin(input: string): string {
-  const url = new URL(input);
+  let url: URL;
+  try {
+    url = new URL(input);
+  } catch {
+    throw new Error('CONTEXTFILL_OAUTH_REDIRECT_ORIGIN must be a valid URL origin.');
+  }
   if (url.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(url.hostname)) {
     throw new Error('CONTEXTFILL_OAUTH_REDIRECT_ORIGIN must be an HTTP loopback origin.');
   }
+  if (url.username || url.password || url.pathname !== '/' || url.search || url.hash || !url.port) {
+    throw new Error(
+      'CONTEXTFILL_OAUTH_REDIRECT_ORIGIN must contain only an HTTP loopback host and explicit port.',
+    );
+  }
   return url.origin;
+}
+
+function servicePort(environment: NodeJS.ProcessEnv): number {
+  const raw = environment.CONTEXTFILL_SERVICE_PORT?.trim() || '4318';
+  const port = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error('CONTEXTFILL_SERVICE_PORT must be an integer from 1 through 65535.');
+  }
+  return port;
+}
+
+export function inspectMailboxSetup(environment: NodeJS.ProcessEnv = process.env): MailboxSetup {
+  const port = servicePort(environment);
+  const redirectOrigin = safeOrigin(
+    environment.CONTEXTFILL_OAUTH_REDIRECT_ORIGIN || `http://localhost:${port}`,
+  );
+  if (Number(new URL(redirectOrigin).port) !== port) {
+    throw new Error('CONTEXTFILL_OAUTH_REDIRECT_ORIGIN port must match CONTEXTFILL_SERVICE_PORT.');
+  }
+  const gmailMissing = [
+    !environment.CONTEXTFILL_GOOGLE_CLIENT_ID?.trim() ? 'CONTEXTFILL_GOOGLE_CLIENT_ID' : null,
+    !environment.CONTEXTFILL_GOOGLE_CLIENT_SECRET?.trim()
+      ? 'CONTEXTFILL_GOOGLE_CLIENT_SECRET'
+      : null,
+  ].filter((value): value is string => value !== null);
+  const outlookMissing = [
+    !environment.CONTEXTFILL_MICROSOFT_CLIENT_ID?.trim() ? 'CONTEXTFILL_MICROSOFT_CLIENT_ID' : null,
+  ].filter((value): value is string => value !== null);
+  return {
+    servicePort: port,
+    redirectOrigin,
+    providers: [
+      {
+        provider: 'gmail',
+        configured: gmailMissing.length === 0,
+        missing: gmailMissing,
+        redirectUri: `${redirectOrigin}/mail/oauth/gmail/callback`,
+        scopes: ['openid', 'email', 'https://www.googleapis.com/auth/gmail.readonly'],
+        registrationType: 'web-application',
+      },
+      {
+        provider: 'outlook',
+        configured: outlookMissing.length === 0,
+        missing: outlookMissing,
+        redirectUri: `${redirectOrigin}/mail/oauth/outlook/callback`,
+        scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Read'],
+        registrationType: 'public-client',
+      },
+    ],
+  };
 }
 
 function compact(value: string | null | undefined, max: number): string | null {
@@ -415,35 +490,30 @@ export class MailboxManager implements MailboxManagerLike {
   }
 
   private config(provider: MailProvider): OAuthConfig | null {
-    const port = this.environment.CONTEXTFILL_SERVICE_PORT || '4318';
-    const redirectOrigin = safeOrigin(
-      this.environment.CONTEXTFILL_OAUTH_REDIRECT_ORIGIN || `http://localhost:${port}`,
-    );
+    const setup = inspectMailboxSetup(this.environment).providers.find(
+      (candidate) => candidate.provider === provider,
+    )!;
+    if (!setup.configured) return null;
     if (provider === 'gmail') {
-      const clientId = this.environment.CONTEXTFILL_GOOGLE_CLIENT_ID?.trim();
-      const clientSecret = this.environment.CONTEXTFILL_GOOGLE_CLIENT_SECRET?.trim();
-      if (!clientId || !clientSecret) return null;
       return {
         provider,
-        clientId,
-        clientSecret,
+        clientId: this.environment.CONTEXTFILL_GOOGLE_CLIENT_ID!.trim(),
+        clientSecret: this.environment.CONTEXTFILL_GOOGLE_CLIENT_SECRET!.trim(),
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenEndpoint: 'https://oauth2.googleapis.com/token',
-        redirectUri: `${redirectOrigin}/mail/oauth/gmail/callback`,
-        scopes: ['openid', 'email', 'https://www.googleapis.com/auth/gmail.readonly'],
+        redirectUri: setup.redirectUri,
+        scopes: setup.scopes,
       };
     }
-    const clientId = this.environment.CONTEXTFILL_MICROSOFT_CLIENT_ID?.trim();
-    if (!clientId) return null;
     const tenant = this.environment.CONTEXTFILL_MICROSOFT_TENANT?.trim() || 'common';
     return {
       provider,
-      clientId,
+      clientId: this.environment.CONTEXTFILL_MICROSOFT_CLIENT_ID!.trim(),
       clientSecret: null,
       authorizationEndpoint: `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/authorize`,
       tokenEndpoint: `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`,
-      redirectUri: `${redirectOrigin}/mail/oauth/outlook/callback`,
-      scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Read'],
+      redirectUri: setup.redirectUri,
+      scopes: setup.scopes,
     };
   }
 

@@ -194,6 +194,7 @@ export class PairingManager {
   }
 
   private async restore(): Promise<void> {
+    if (this.legacyOrigin()) return;
     if (this.environment.CONTEXTFILL_PAIRING_RESET === '1') {
       try {
         await this.credentialStore.deletePairing();

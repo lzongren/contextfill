@@ -13,7 +13,11 @@ cd contextfill-runtime
 contextfill-service --init
 ```
 
-Edit the generated `.env` with your Gmail and/or Microsoft OAuth client settings. Provider callback setup is documented at <https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md>.
+Edit the generated `.env` with your Gmail and/or Microsoft OAuth client settings. Provider callback setup is documented at <https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md>. Before starting OAuth, validate the exact callbacks, scopes, loopback port, and private file permissions without exposing credential values:
+
+```bash
+contextfill-service --doctor
+```
 
 Start the service:
 

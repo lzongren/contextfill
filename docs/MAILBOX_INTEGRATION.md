@@ -33,7 +33,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 3. Install the companion package and create a private runtime configuration:
 
    ```bash
-   npm install --global ./contextfill-companion-v0.2.0-beta.3.tgz
+   npm install --global ./contextfill-companion-v0.2.0-beta.4.tgz
    mkdir contextfill-runtime
    cd contextfill-runtime
    contextfill-service --init
@@ -59,7 +59,15 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
    ```
 
 2. Configure at least one provider below.
-3. Start the companion service:
+3. Validate the local configuration. The doctor prints exact callbacks and scopes, checks that the loopback ports agree and `.env` is owner-only, and never prints credential values:
+
+   ```bash
+   contextfill-service --doctor
+   ```
+
+   From a source checkout, use `npm run service -- --doctor` instead. A nonzero result means the consent flow is not ready; correct the reported setting before continuing.
+
+4. Start the companion service:
 
    ```bash
    contextfill-service
@@ -67,9 +75,9 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 
    From a source checkout, use `npm run service` instead.
 
-4. Copy the six-digit pairing code printed in the terminal. Open ContextFill, click the message-source button, enter the code, and click **Pair service**. The code is single-use and expires after 10 minutes.
-5. Connect Gmail or Outlook and finish the provider consent flow in the new tab.
-6. Reopen ContextFill on a real page requesting a verification code and select the connected mailbox as the source. A service restart restores the refresh authorization from the OS keychain.
+5. Copy the six-digit pairing code printed in the terminal. Open ContextFill, click the message-source button, enter the code, and click **Pair service**. The code is single-use and expires after 10 minutes.
+6. Connect Gmail or Outlook and finish the provider consent flow in the new tab.
+7. Reopen ContextFill on a real page requesting a verification code and select the connected mailbox as the source. A service restart restores the refresh authorization from the OS keychain.
 
 Leave **GPT-5.6 for real mail** disabled if message bodies must remain on the device. Enabling it allows one prefiltered message at a time to pass from the loopback service to the configured OpenAI API with `store: false`; deterministic code still makes every allow/warn/block decision.
 
