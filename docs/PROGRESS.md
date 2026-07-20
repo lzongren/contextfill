@@ -17,4 +17,7 @@
 - [x] Confirmed the extension bundle contains no API-key references, only `.env.example` exists, and the production dependency audit reports zero vulnerabilities.
 - [x] Published the project at `https://github.com/lzongren/contextfill` with CI and public-repository standards.
 - [x] Split fast iteration CI from full release verification and automated tagged GitHub Release artifacts with checksums.
+- [x] Added provider-neutral mailbox messages, Gmail and Outlook read-only OAuth adapters, bounded recent-message ingestion, source controls, and connector tests.
+- [x] Prepared the real-mailbox connector artifact as `v0.2.0-beta.1`; prerelease tags are labeled as GitHub prereleases.
+- [ ] Complete a live OAuth connection with user-owned Gmail and Outlook app registrations, then add OS-keychain token persistence and per-install loopback pairing.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.

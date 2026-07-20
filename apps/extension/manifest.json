@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "ContextFill",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "version_name": "0.2.0-beta.1",
   "description": "Verifies message-to-site context before filling a temporary verification code.",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["http://127.0.0.1:4318/*"],
   "action": {
     "default_title": "Open ContextFill",

@@ -94,7 +94,7 @@ The release was verified without a key. A live GPT-5.6 call therefore depends on
 npm run verify
 ```
 
-This checks formatting, lint, types, 26 unit/integration cases, three production builds, packaged-extension loading, and five installed-Chrome acceptance cases.
+This checks formatting, lint, types, 32 unit/integration cases, three production builds, packaged-extension loading, and five installed-Chrome acceptance cases.
 
 ## Troubleshooting
 

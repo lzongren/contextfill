@@ -31,3 +31,9 @@ Playwright's bundled Chromium is used for command-line MV3 side-loading because 
 ## D-008: Fast iteration CI and full tag-gated releases are separate
 
 Pull requests and pushes to `main` run formatting, lint, type, and unit/integration checks under the existing required `verify` status. Version tags run the complete browser-inclusive release gate before packaging and publishing a version-derived ZIP and checksum to both workflow artifacts and GitHub Releases. This keeps feedback fast without weakening the release gate.
+
+## D-009: Mailbox OAuth stays in a loopback companion service
+
+Gmail and Outlook use authorization code flow with PKCE through the existing Node.js companion service. The extension stores only the selected provider, while access and refresh tokens remain in service memory. Provider APIs return a bounded recent-message set that is normalized to the shared mailbox schema before the existing extraction, ranking, deterministic policy, and explicit-fill pipeline. Session-only tokens add reconnection friction but avoid introducing plaintext persistent credentials before OS-keychain support exists.
+
+Real mailbox messages use deterministic extraction by default. Model extraction is a separate explicit opt-in because configuring an OpenAI key must not silently cause personal message content to leave the device.

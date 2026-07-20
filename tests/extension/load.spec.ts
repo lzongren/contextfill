@@ -21,6 +21,15 @@ test('the packaged MV3 extension loads and boots its popup bundle', async () => 
     await expect(popup.getByRole('heading')).toContainText(
       /ContextFill cannot inspect|Looking for a trusted match/,
     );
+
+    await popup.getByRole('button', { name: /Message source:/ }).click();
+    await expect(
+      popup.getByRole('heading', { name: 'Choose where codes come from' }),
+    ).toBeVisible();
+    await expect(
+      popup.locator('.source-card').getByText('Demo inbox', { exact: true }).first(),
+    ).toBeVisible();
+    await expect(popup.getByRole('button', { name: 'Using demo inbox' })).toBeDisabled();
   } finally {
     await context.close();
   }

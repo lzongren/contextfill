@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServiceApp } from '../../apps/local-service/src/app.js';
 import { extractWithGpt, type ResponsesClient } from '../../apps/local-service/src/extractor.js';
+import type { MailboxManagerLike } from '../../apps/local-service/src/mailbox.js';
 import { extractDeterministic, makeSyntheticInbox } from '../../packages/core/src/index.js';
 
 const now = new Date('2026-07-20T19:00:00.000Z');
 const message = makeSyntheticInbox(now)[0]!;
 const originalKey = process.env.OPENAI_API_KEY;
+const originalExtensionId = process.env.CONTEXTFILL_EXTENSION_ID;
 
 afterEach(() => {
   if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
   else process.env.OPENAI_API_KEY = originalKey;
+  if (originalExtensionId === undefined) delete process.env.CONTEXTFILL_EXTENSION_ID;
+  else process.env.CONTEXTFILL_EXTENSION_ID = originalExtensionId;
 });
 
 describe('local extraction service', () => {
@@ -60,6 +64,39 @@ describe('local extraction service', () => {
       body: '{}',
     });
     expect(oversized.status).toBe(413);
+  });
+
+  it('exposes normalized mailbox data only to the configured extension origin', async () => {
+    process.env.CONTEXTFILL_EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
+    const mailbox: MailboxManagerLike = {
+      statuses: () => [
+        {
+          provider: 'gmail',
+          configured: true,
+          connected: true,
+          account: 'person@gmail.example',
+          sessionOnly: true,
+        },
+      ],
+      beginConnection: vi.fn(async () => 'https://accounts.example/authorize'),
+      completeConnection: vi.fn(async () => 'person@gmail.example'),
+      disconnect: vi.fn(async () => undefined),
+      listMessages: vi.fn(async () => [message]),
+    };
+    const app = createServiceApp(
+      vi.fn(async () => extractDeterministic(message)!),
+      mailbox,
+    );
+    const allowed = await app.request('/mail/messages/gmail', {
+      headers: { origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
+    });
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toEqual({ messages: [message] });
+
+    const otherExtension = await app.request('/mail/messages/gmail', {
+      headers: { origin: 'chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba' },
+    });
+    expect(otherExtension.status).toBe(403);
   });
 });
 

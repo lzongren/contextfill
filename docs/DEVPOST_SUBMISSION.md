@@ -24,7 +24,7 @@ ContextFill started from a simple product question: what if moving a temporary s
 
 ## What it does
 
-ContextFill is a Chrome Manifest V3 extension backed by a built-in synthetic inbox. When the user opens the extension on a verification page, it:
+ContextFill is a Chrome Manifest V3 extension backed by a built-in synthetic inbox and optional Gmail/Outlook connectors. When the user opens the extension on a verification page, it:
 
 1. Detects a single OTP field or a split code group.
 2. Extracts recent candidates with GPT-5.6 when the optional local service is configured, or a deterministic fallback otherwise.
@@ -77,7 +77,7 @@ When the service, key, API, timeout, JSON, schema, or evidence validation fails,
 - No-key deterministic operation across every required judge fixture.
 - Strict GPT-5.6 integration with source-evidence validation and clean fallback.
 - Least-privilege page access and loopback-only model service.
-- 26 unit/integration tests, five installed-Chrome acceptance cases, and packaged-extension load verification.
+- 32 unit/integration tests, five installed-Chrome acceptance cases, and packaged-extension load verification.
 - Complete judge, threat, demo, screenshot, collaboration, and release documentation.
 
 ## What was learned
@@ -92,7 +92,7 @@ Browser behavior also reinforced that “obvious” field heuristics conflict in
 - Add authenticated, rate-limited local transport.
 - Improve Unicode script and brand-risk analysis without overstating coverage.
 - Support open shadow roots and carefully scoped iframe workflows.
-- Add a provider interface and only then consider Gmail OAuth test-mode integration.
+- Add OS-keychain token persistence, per-install loopback pairing, and live provider conformance tests before general mailbox distribution.
 - Explore other temporary information, such as magic links and booking references, while retaining explicit context checks.
 
 ## Judge testing

@@ -91,10 +91,15 @@ jobs:
               "artifacts/${ARTIFACT_NAME}.sha256" \
               --clobber
           else
+            prerelease_args=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then
+              prerelease_args+=(--prerelease)
+            fi
             gh release create "$RELEASE_TAG" \
               "artifacts/${ARTIFACT_NAME}" \
               "artifacts/${ARTIFACT_NAME}.sha256" \
               --verify-tag \
               --generate-notes \
+              "${prerelease_args[@]}" \
               --title "ContextFill ${RELEASE_TAG}"
           fi
