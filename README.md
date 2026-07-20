@@ -4,7 +4,7 @@
 
 > ContextFill securely brings temporary information from a trusted message to the page requesting it, while verifying that the message and website belong together.
 
-ContextFill is a privacy-first Chrome extension that finds verification codes in its built-in synthetic inbox or an explicitly connected Gmail/Outlook account, compares message evidence with the requesting page, explains an **allow**, **warn**, or **block** decision, and fills only after the user explicitly approves. It never submits the form.
+ContextFill is a privacy-first Chrome extension that finds verification codes in its built-in synthetic inbox, a one-time imported `.eml` file, or an explicitly connected Gmail/Outlook account, compares message evidence with the requesting page, explains an **allow**, **warn**, or **block** decision, and fills only after the user explicitly approves. It never submits the form.
 
 This is a judge-testable hackathon prototype, not a production security product.
 
@@ -42,7 +42,7 @@ Then:
 
 No email account, cloud setup, personal data, paid service, or OpenAI API key is required. See [Judge testing](docs/JUDGE_TESTING.md) for every fixture and expected result.
 
-For real use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for installation, least-privilege OAuth setup, current security boundaries, and provider limitations.
+For a real-message test without cloud setup, export one message from Gmail or Outlook as `.eml`, open **Message source → Import email file**, and choose it. The bounded file is parsed locally inside the popup, used once, and never persisted. For ongoing use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for both paths, least-privilege OAuth setup, current security boundaries, and provider limitations.
 
 ## Architecture
 
@@ -51,6 +51,7 @@ flowchart LR
   U["User opens popup"] --> C["On-demand content script"]
   C --> F["Field detection and page context"]
   S["Synthetic inbox"] --> X["Candidate extraction"]
+  I["One-time .eml import"] --> X
   X --> R["Transparent ranking"]
   F --> P["Deterministic trust policy"]
   R --> P
@@ -66,7 +67,7 @@ The main boundaries are deliberately small:
 
 - `packages/core` owns schemas, fixtures, extraction, ranking, domains, policy, confirmation data, and field mutation.
 - `apps/demo` owns honest localhost fixtures and their visible simulated hostnames.
-- `apps/extension` owns user activation, evidence presentation, explicit approval, and short-lived state.
+- `apps/extension` owns user activation, local MIME import, evidence presentation, explicit approval, and short-lived state.
 - `apps/local-service` owns the API key and optional GPT-5.6 Responses API call.
 - The same loopback service owns Gmail/Outlook OAuth tokens and normalizes a bounded recent-message set; tokens never enter the extension bundle.
 - The model never returns or influences an allow/warn/block decision.
@@ -105,7 +106,7 @@ The MV3 manifest requests:
 
 - `activeTab` for temporary access after the user invokes the extension.
 - `scripting` for on-demand main-frame injection.
-- `storage` for the selected source, explicit model opt-in, and random companion-service pairing capability. Message content, codes, and OAuth tokens are never stored there.
+- `storage` for the selected persistent source, explicit model opt-in, and random companion-service pairing capability. Imported message content, codes, and OAuth tokens are never stored there.
 - A single host permission, `http://127.0.0.1:4318/*`, for the optional loopback extractor.
 
 It does **not** request `<all_urls>`, browsing history, clipboard, tabs, password, or form-submission privileges. Chrome documents `activeTab` as temporary access granted by an explicit extension gesture, and supports pairing it with `scripting.executeScript()` ([activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab), [scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)).
@@ -156,13 +157,13 @@ The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 
 Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
 
-Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.2`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.3`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
 Download verified extension packages and their checksums from [GitHub Releases](https://github.com/lzongren/contextfill/releases).
 
 ## Security and sensitive-data behavior
 
-- Codes exist only in synthetic fixture source and short-lived popup variables.
+- Codes from synthetic, imported, or connected sources exist only in short-lived popup variables after ingestion; imported files are never persisted by ContextFill.
 - Runtime candidate state clears after fill, dismissal, explicit expiry, or at most 90 seconds.
 - Expired candidate values are removed before the blocked card is retained.
 - Successful fills mark a stable candidate ID as used for 15 minutes; no code value is stored in replay state.
@@ -190,6 +191,7 @@ The popup and judge lab use semantic labels, keyboard-operable native controls, 
 
 - This is a hackathon prototype, not phishing-proof or production-ready.
 - Gmail and Outlook require a locally configured OAuth application and running companion service. Refresh tokens use the native OS keychain; if it is unavailable, the UI explicitly reports session-only authorization.
+- One-time import accepts only `.eml` files up to 2 MB. Attachments are excluded from extraction, and encrypted or malformed messages may not yield readable content.
 - Sender addresses are evidence, not cryptographic proof of email authentication.
 - Lookalike detection covers exact registrable-domain mismatch plus a controlled set of Unicode, punycode, substitution, hyphen, and deceptive-label signals. It does not detect every homograph.
 - Field detection does not traverse iframes or closed shadow roots and cannot support every framework-controlled input.

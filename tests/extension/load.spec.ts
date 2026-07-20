@@ -74,6 +74,13 @@ test('the packaged MV3 extension loads and boots its popup bundle', async () => 
       popup.locator('.source-card').getByText('Demo inbox', { exact: true }).first(),
     ).toBeVisible();
     await expect(popup.getByRole('button', { name: 'Using demo inbox' })).toBeDisabled();
+    await expect(
+      popup.locator('.source-card').getByText('Import email file', { exact: true }).first(),
+    ).toBeVisible();
+    await expect(popup.getByLabel('Choose exported email file')).toHaveAttribute(
+      'accept',
+      '.eml,message/rfc822',
+    );
     await expect(popup.getByText('Pairing required', { exact: true })).toBeVisible();
     await popup.getByRole('textbox', { name: 'Companion service pairing code' }).fill('482913');
     await popup.getByRole('button', { name: 'Pair service' }).click();

@@ -45,3 +45,7 @@ An extension installation generates a random 256-bit capability after the user e
 ## D-011: Releases include an installable companion CLI
 
 Real-mail use must not require a source checkout or TypeScript toolchain. Release tags therefore publish a bundled Node.js companion `.tgz` beside the extension ZIP, with independent checksums. Its only runtime dependency is the platform keyring binding. The `contextfill-service --init` command creates an owner-only `.env` without overwriting an existing file.
+
+## D-012: Exported `.eml` is the provider-independent real-message bridge
+
+OAuth app registration is a deployment choice owned by the user's Google Cloud project or Microsoft tenant. ContextFill therefore also accepts one explicitly chosen RFC 5322 `.eml` file in the popup. A maintained, browser-compatible MIME parser handles common multipart and encoded messages under a 2 MB input cap and explicit nesting/header limits. Only normalized sender, subject, date, body text, and HTTP(S) link evidence enter the existing schema; attachments never enter extraction. The raw file and normalized body are dropped immediately after local deterministic candidate extraction, never enter optional model extraction, and are never written to extension storage.

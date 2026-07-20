@@ -18,7 +18,7 @@ const domainPattern = /\b(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,63})(?:[/:?#]
 function inferService(message: SyntheticMessage): string | null {
   if (message.serviceHint) return message.serviceHint;
   const match = `${message.subject} ${message.body}`.match(
-    /\b([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s+(?:verification|account|sign-in)/,
+    /\b(?:Your\s+)?([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)?)\s+(?:verification|account|sign-in)/,
   );
   return match?.[1] ?? null;
 }

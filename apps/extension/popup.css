@@ -304,6 +304,27 @@ input:focus-visible {
   min-height: 34px;
 }
 
+.file-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.file-button:has(.file-input:focus-visible) {
+  outline: 3px solid #7aaa27;
+  outline-offset: 2px;
+}
+
 .simulation-note {
   color: #52605b;
   border: 1px dashed #acb5aa;

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlook connectors, loopback companion service, deterministic core, and localhost judge pages. ContextFill is evolving toward personal real-mailbox use; it is not a production authentication control.
+This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml` import, Gmail and Outlook connectors, loopback companion service, deterministic core, and localhost judge pages. ContextFill is evolving toward personal real-mailbox use; it is not a production authentication control.
 
 ## Assets
 
@@ -18,7 +18,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 ## Trust boundaries
 
 1. **Webpage → isolated content script:** the page DOM, labels, metadata, and fields are untrusted. Only localhost may provide a simulated hostname.
-2. **Mailbox provider or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, and any instructions in a message are untrusted data.
+2. **Mailbox provider, imported file, or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, attachments, and any instructions in a message are untrusted data.
 3. **Extension popup → content script:** only an explicit popup action carries a value to a currently detected field.
 4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require a paired capability and matching extension installation ID; browser `Origin` is cross-checked when present.
 5. **Loopback service → OS credential manager:** refresh tokens and the hashed pairing record persist through the native platform keychain; access tokens remain in memory.
@@ -93,11 +93,19 @@ This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlo
 
 **Residual risk:** Local malware running as the user can inspect process memory or invoke the same credential APIs. Gmail's scope still permits broad read access and requires provider review for public distribution. Live provider audit verification remains required before general release.
 
+### Malicious or resource-exhausting `.eml` import
+
+**Threat:** A selected email file is oversized, malformed, deeply nested, carries executable HTML, hides domain evidence in a link, or embeds sensitive attachments.
+
+**Mitigations:** Import is an explicit one-file gesture and accepts only a `.eml` filename up to 2 MB. The browser-compatible MIME parser has explicit 30-level nesting and 256 KB header limits. Scripts, styles, and templates are removed from the HTML string without rendering it; only text and HTTP(S) `href` values enter the bounded mailbox schema. Parsed attachments are never included in extraction, ranking, model input, or UI. Missing Subject/Date/body metadata and invalid normalized sender data fail closed. The raw file and normalized body are dropped immediately after local deterministic candidate extraction and cannot enter the optional model path.
+
+**Residual risk:** The parser must still inspect the bounded attachment bytes contained in the selected file, and complex or encrypted MIME may be rejected. MIME parser supply-chain integrity and worst-case performance require continued review. A malicious but schema-valid message can still present misleading evidence, so deterministic domain policy and user review remain mandatory.
+
 ### Sensitive logs, clipboard, storage, and analytics
 
 **Threat:** A full code leaks through console output, clipboard, persistent extension storage, telemetry, or screenshots.
 
-**Mitigations:** Production code does not log codes, never touches the clipboard, and has no analytics. Extension storage contains only the selected source, model opt-in, and random pairing capability; access is restricted to trusted extension contexts. Codes, message bodies, and OAuth tokens are excluded. Values are masked by default, cannot be revealed on blocks, and clear from popup state after fill/dismiss/expiry/90 seconds. Refresh tokens and only the hash of the pairing capability use the OS keychain.
+**Mitigations:** Production code does not log codes, never touches the clipboard, and has no analytics. Extension storage contains only the selected persistent source, model opt-in, and random pairing capability; access is restricted to trusted extension contexts. Imported files, codes, message bodies, and OAuth tokens are excluded. Values are masked by default, cannot be revealed on blocks, and clear from popup state after fill/dismiss/expiry/90 seconds. Refresh tokens and only the hash of the pairing capability use the OS keychain.
 
 **Residual risk:** A user can intentionally reveal or photograph a code. Browser developer tooling or local profile access can expose extension memory and its pairing capability.
 

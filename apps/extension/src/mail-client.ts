@@ -4,9 +4,10 @@ import { mailboxMessageSchema, type MailboxMessage } from '../../../packages/cor
 const serviceBase = 'http://127.0.0.1:4318';
 
 export const mailProviderSchema = z.enum(['gmail', 'outlook']);
-export const mailSourceSchema = z.enum(['synthetic', 'gmail', 'outlook']);
+export const mailSourceSchema = z.enum(['synthetic', 'gmail', 'outlook', 'import']);
 export type MailProvider = z.infer<typeof mailProviderSchema>;
 export type MailSource = z.infer<typeof mailSourceSchema>;
+export type PersistentMailSource = Exclude<MailSource, 'import'>;
 
 const providerStatusSchema = z
   .object({
@@ -119,13 +120,13 @@ export async function fetchMailboxMessages(provider: MailProvider): Promise<Mail
   return messagesResponseSchema.parse(await serviceRequest(`/mail/messages/${provider}`)).messages;
 }
 
-export async function loadMailSource(): Promise<MailSource> {
+export async function loadMailSource(): Promise<PersistentMailSource> {
   const stored = await chrome.storage.local.get('mailSource');
   const parsed = mailSourceSchema.safeParse(stored.mailSource);
-  return parsed.success ? parsed.data : 'synthetic';
+  return parsed.success && parsed.data !== 'import' ? parsed.data : 'synthetic';
 }
 
-export async function saveMailSource(source: MailSource): Promise<void> {
+export async function saveMailSource(source: PersistentMailSource): Promise<void> {
   await chrome.storage.local.set({ mailSource: source });
 }
 
@@ -153,5 +154,10 @@ function pairingSecret(): string {
 export function sourceLabel(source: MailSource): string {
   if (source === 'gmail') return 'Gmail';
   if (source === 'outlook') return 'Outlook';
+  if (source === 'import') return 'Imported email';
   return 'Demo inbox';
+}
+
+export function shouldUseModelForSource(source: MailSource, realMailModelOptIn: boolean): boolean {
+  return source === 'synthetic' || (source !== 'import' && realMailModelOptIn);
 }
