@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish or republish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: verify and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate release tag and version
+        shell: bash
+        run: |
+          if ! git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            echo "::error::${RELEASE_TAG} is not an existing tag."
+            exit 1
+          fi
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "$RELEASE_TAG" != "v${package_version}" ]]; then
+            echo "::error::Tag ${RELEASE_TAG} does not match package version v${package_version}."
+            exit 1
+          fi
+          echo "PACKAGE_VERSION=${package_version}" >> "$GITHUB_ENV"
+          echo "ARTIFACT_NAME=contextfill-extension-v${package_version}.zip" >> "$GITHUB_ENV"
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browser runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify release candidate
+        run: npm run verify
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Create checksum
+        working-directory: artifacts
+        run: sha256sum "$ARTIFACT_NAME" > "${ARTIFACT_NAME}.sha256"
+
+      - name: Preserve workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextfill-extension-${{ env.PACKAGE_VERSION }}
+          path: |
+            artifacts/${{ env.ARTIFACT_NAME }}
+            artifacts/${{ env.ARTIFACT_NAME }}.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "artifacts/${ARTIFACT_NAME}" \
+              "artifacts/${ARTIFACT_NAME}.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "artifacts/${ARTIFACT_NAME}" \
+              "artifacts/${ARTIFACT_NAME}.sha256" \
+              --verify-tag \
+              --generate-notes \
+              --title "ContextFill ${RELEASE_TAG}"
+          fi

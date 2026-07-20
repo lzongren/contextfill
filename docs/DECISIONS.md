@@ -27,3 +27,7 @@ GPT-5.6 and deterministic candidates share the same message-derived candidate ID
 ## D-007: Extension loading and page behavior use different browser channels
 
 Playwright's bundled Chromium is used for command-line MV3 side-loading because stable Chrome removed that headless testing path. Functional judge-page acceptance remains on installed Chrome. Manual Chrome installation remains the judge workflow.
+
+## D-008: Fast iteration CI and full tag-gated releases are separate
+
+Pull requests and pushes to `main` run formatting, lint, type, and unit/integration checks under the existing required `verify` status. Version tags run the complete browser-inclusive release gate before packaging and publishing a version-derived ZIP and checksum to both workflow artifacts and GitHub Releases. This keeps feedback fast without weakening the release gate.

@@ -1,11 +1,20 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const root = resolve(import.meta.dirname, '..');
 const artifacts = resolve(root, 'artifacts');
 const extension = resolve(root, 'dist/extension');
-const output = resolve(artifacts, 'contextfill-extension-v0.1.0.zip');
+const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
+
+if (
+  typeof packageJson.version !== 'string' ||
+  !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(packageJson.version)
+) {
+  throw new Error('package.json must contain a valid semantic version');
+}
+
+const output = resolve(artifacts, `contextfill-extension-v${packageJson.version}.zip`);
 
 await mkdir(artifacts, { recursive: true });
 await rm(output, { force: true });

@@ -24,7 +24,8 @@
     "test:browser": "playwright test",
     "test:extension": "playwright test --config playwright.extension.config.ts",
     "package": "npm run build:extension && node scripts/package-extension.mjs",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run test:extension && npm run test:browser"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run check && npm run build && npm run test:extension && npm run test:browser"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",

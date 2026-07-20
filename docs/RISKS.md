@@ -8,3 +8,4 @@
 | Extension leaks a code after use                                | In-memory state only, masked display, short timeout, clear after fill/dismiss/expiry          | Implemented and reviewed                                           |
 | Local service is exposed cross-origin                           | Loopback binding, allowlisted localhost and extension origins, bounded request size           | Boundary tests pass; production auth remains future work           |
 | Judge machine lacks Playwright browser                          | Automated suite uses installed Chrome plus documented manual flow                             | Chromium install needed only for contributor verification          |
+| Published extension does not match its version tag              | Exact tag/package-version check, tagged checkout, full verification, generated checksum       | Enforced by the GitHub Release workflow                            |
