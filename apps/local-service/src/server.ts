@@ -1,9 +1,17 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { realpathSync } from 'node:fs';
+import { stdin, stdout } from 'node:process';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { createServiceApp } from './app.js';
-import { helpText, initializeConfig, inspectCompanionReadiness } from './cli.js';
+import {
+  configureOutlook,
+  helpText,
+  initializeConfig,
+  inspectCompanionReadiness,
+  outlookSetupInstructions,
+} from './cli.js';
 import { createMailboxManager } from './mailbox.js';
 import { createPairingManager } from './pairing.js';
 
@@ -23,6 +31,37 @@ function isEntrypoint(): boolean {
 if (isEntrypoint()) {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(helpText);
+  } else if (process.argv.includes('--setup')) {
+    const setupIndex = process.argv.indexOf('--setup');
+    const provider = process.argv[setupIndex + 1];
+    if (provider !== 'outlook') {
+      console.error('Usage: contextfill-service --setup outlook [--tenant common]');
+      console.error('Gmail setup still uses the private .env flow documented in --help.');
+      process.exitCode = 1;
+    } else {
+      const prompt = createInterface({ input: stdin, output: stdout });
+      try {
+        console.log(outlookSetupInstructions());
+        console.log('');
+        const clientId = await prompt.question('Microsoft Application (client) ID: ');
+        const tenantIndex = process.argv.indexOf('--tenant');
+        const tenant = tenantIndex === -1 ? 'common' : (process.argv[tenantIndex + 1] ?? '');
+        const output = await configureOutlook(process.cwd(), clientId, tenant);
+        console.log(`Saved Outlook settings to ${output} with owner-only permissions.`);
+        const report = await inspectCompanionReadiness(process.cwd(), {
+          ...process.env,
+          CONTEXTFILL_MICROSOFT_CLIENT_ID: clientId.trim(),
+          CONTEXTFILL_MICROSOFT_TENANT: tenant,
+        });
+        console.log(report.text);
+        if (!report.ok) process.exitCode = 1;
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : 'Could not save Outlook setup.');
+        process.exitCode = 1;
+      } finally {
+        prompt.close();
+      }
+    }
   } else if (process.argv.includes('--doctor')) {
     const report = await inspectCompanionReadiness();
     console.log(report.text);

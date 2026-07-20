@@ -8,6 +8,7 @@ ContextFill is a hackathon prototype that transfers temporary information only a
 
 - `npm run demo` — start the synthetic judge experience.
 - `npm run service` — start the optional local GPT-5.6 extractor.
+- `npm run service -- --setup outlook` — guide Outlook registration and save its public client ID.
 - `npm run service -- --doctor` — validate mailbox OAuth setup without printing secrets.
 - `npm test` — run unit and integration tests.
 - `npm run test:browser` — run browser acceptance tests.

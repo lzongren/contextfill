@@ -13,7 +13,13 @@ cd contextfill-runtime
 contextfill-service --init
 ```
 
-Edit the generated `.env` with your Gmail and/or Microsoft OAuth client settings. Provider callback setup is documented at <https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md>. Before starting OAuth, validate the exact callbacks, scopes, loopback port, and private file permissions without exposing credential values:
+For Outlook, run the guided setup after creating a Microsoft Entra app registration. It prints the exact callback and delegated permissions, asks only for the public Application (client) ID, preserves unrelated settings, and keeps `.env` owner-only:
+
+```bash
+contextfill-service --setup outlook
+```
+
+Gmail's OAuth web client includes a secret, so configure its values directly in the private `.env` file. Provider registration is documented at <https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md>. Before starting OAuth, validate the exact callbacks, scopes, loopback port, and private file permissions without exposing credential values:
 
 ```bash
 contextfill-service --doctor

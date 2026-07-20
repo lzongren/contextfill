@@ -1,4 +1,4 @@
-import { stat, writeFile } from 'node:fs/promises';
+import { chmod, lstat, readFile, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { inspectMailboxSetup } from './mailbox.js';
 
@@ -27,6 +27,8 @@ export const helpText = `ContextFill companion service
 
 Usage:
   contextfill-service --init   create a private .env template in the current directory
+  contextfill-service --setup outlook [--tenant common]
+                               guide Microsoft app registration and save its public client ID
   contextfill-service --doctor validate mailbox OAuth readiness without printing secrets
   contextfill-service          start the loopback service on 127.0.0.1:4318
   contextfill-service --help   show this help
@@ -44,6 +46,90 @@ export type DoctorReport = {
   ok: boolean;
   text: string;
 };
+
+const microsoftClientIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const microsoftTenantPattern =
+  /^(?:common|consumers|organizations|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?)$/iu;
+
+function replaceEnvironmentValue(contents: string, key: string, value: string): string {
+  const assignment = new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=`, 'u');
+  const lines = contents.split('\n');
+  let replaced = false;
+  const updated = lines.filter((line) => {
+    if (!assignment.test(line)) return true;
+    if (replaced) return false;
+    replaced = true;
+    return true;
+  });
+  if (replaced) {
+    const index = updated.findIndex((line) => assignment.test(line));
+    updated[index] = `${key}=${value}`;
+  } else {
+    if (updated.at(-1) !== '') updated.push('');
+    updated.push(`${key}=${value}`);
+  }
+  return updated.join('\n');
+}
+
+export function outlookSetupInstructions(environment: NodeJS.ProcessEnv = process.env): string {
+  const setup = inspectMailboxSetup(environment);
+  const outlook = setup.providers.find((provider) => provider.provider === 'outlook');
+  if (!outlook) throw new Error('Outlook setup metadata is unavailable.');
+  return [
+    'ContextFill guided Outlook setup',
+    '',
+    '1. Open Microsoft Entra app registrations:',
+    '   https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+    '2. Create a registration for the account types you intend to use.',
+    '3. Under Authentication, add a Mobile and desktop applications platform with:',
+    `   ${outlook.redirectUri}`,
+    '4. Enable public client flows.',
+    `5. Add delegated permissions: ${outlook.scopes.filter((scope) => !['openid', 'profile', 'email', 'offline_access'].includes(scope)).join(' ')}`,
+    '6. Copy the Application (client) ID. ContextFill will save that public identifier locally.',
+    '   The default tenant is common; pass --tenant with a tenant ID or domain to restrict it.',
+    '',
+    'ContextFill never asks for a Microsoft client secret.',
+  ].join('\n');
+}
+
+export async function configureOutlook(
+  directory: string,
+  clientIdInput: string,
+  tenantInput = 'common',
+): Promise<string> {
+  const clientId = clientIdInput.trim();
+  const tenant = tenantInput.trim() || 'common';
+  if (!microsoftClientIdPattern.test(clientId)) {
+    throw new Error('Microsoft Application (client) ID must be a valid UUID.');
+  }
+  if (!microsoftTenantPattern.test(tenant)) {
+    throw new Error(
+      'Microsoft tenant must be common, consumers, organizations, a tenant UUID, or a tenant domain.',
+    );
+  }
+
+  const output = resolve(directory, '.env');
+  let contents: string;
+  try {
+    const details = await lstat(output);
+    if (!details.isFile() || details.isSymbolicLink()) {
+      throw new Error('.env must be a regular file owned by the current user.');
+    }
+    contents = await readFile(output, 'utf8');
+    if (process.platform !== 'win32') await chmod(output, 0o600);
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? error.code : undefined;
+    if (code !== 'ENOENT') throw error;
+    contents = environmentTemplate;
+  }
+
+  contents = replaceEnvironmentValue(contents, 'CONTEXTFILL_MICROSOFT_CLIENT_ID', clientId);
+  contents = replaceEnvironmentValue(contents, 'CONTEXTFILL_MICROSOFT_TENANT', tenant);
+  await writeFile(output, contents, { encoding: 'utf8', mode: 0o600 });
+  if (process.platform !== 'win32') await chmod(output, 0o600);
+  return output;
+}
 
 export async function inspectCompanionReadiness(
   directory = process.cwd(),
