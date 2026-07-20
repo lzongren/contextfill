@@ -23,9 +23,10 @@ export const verificationCandidateSchema = z
 
 export type VerificationCandidate = z.infer<typeof verificationCandidateSchema>;
 
-export const syntheticMessageSchema = z
+export const mailboxMessageSchema = z
   .object({
     id: z.string().min(1).max(160),
+    source: z.enum(['synthetic', 'gmail', 'outlook', 'import']).optional(),
     senderName: z.string().max(320).nullable(),
     senderAddress: z.string().email().max(320).nullable(),
     subject: z.string().min(1).max(500),
@@ -36,7 +37,12 @@ export const syntheticMessageSchema = z
   })
   .strict();
 
-export type SyntheticMessage = z.infer<typeof syntheticMessageSchema>;
+export type MailboxMessage = z.infer<typeof mailboxMessageSchema>;
+
+// Kept as an alias while the synthetic judge fixtures and older integrations migrate to the
+// provider-neutral mailbox terminology.
+export const syntheticMessageSchema = mailboxMessageSchema;
+export type SyntheticMessage = MailboxMessage;
 
 export const pageContextSchema = z
   .object({

@@ -27,6 +27,22 @@ describe('deterministic extraction', () => {
     expect(extractDeterministic(receipt)).toBeNull();
   });
 
+  it('recognizes common real-mailbox passcode wording', () => {
+    expect(
+      extractDeterministic({
+        id: 'gmail:passcode',
+        source: 'gmail',
+        senderName: 'Example Security',
+        senderAddress: 'security@example.com',
+        subject: 'Your account passcode',
+        body: 'Your sign-in passcode is 654321. Use it only at account.example.com.',
+        receivedAt: now.toISOString(),
+        expiresAt: null,
+        serviceHint: 'Example',
+      }),
+    ).toMatchObject({ value: '654321', type: 'otp' });
+  });
+
   it('classifies a magic link without offering an OTP value', () => {
     const magic = extractDeterministic(messages.find((message) => message.id === 'magic-link')!);
     expect(magic).toMatchObject({ type: 'magic_link', value: null });

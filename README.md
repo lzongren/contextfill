@@ -4,7 +4,7 @@
 
 > ContextFill securely brings temporary information from a trusted message to the page requesting it, while verifying that the message and website belong together.
 
-ContextFill is a privacy-first Chrome extension prototype for OpenAI Build Week. It finds verification codes in a built-in synthetic inbox, compares message evidence with the requesting page, explains an **allow**, **warn**, or **block** decision, and fills only after the user explicitly approves. It never submits the form.
+ContextFill is a privacy-first Chrome extension that finds verification codes in its built-in synthetic inbox or an explicitly connected Gmail/Outlook account, compares message evidence with the requesting page, explains an **allow**, **warn**, or **block** decision, and fills only after the user explicitly approves. It never submits the form.
 
 This is a judge-testable hackathon prototype, not a production security product.
 
@@ -42,6 +42,8 @@ Then:
 
 No email account, cloud setup, personal data, paid service, or OpenAI API key is required. See [Judge testing](docs/JUDGE_TESTING.md) for every fixture and expected result.
 
+For real use, ContextFill can connect to Gmail or Outlook through its loopback companion service. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for least-privilege OAuth setup, current security boundaries, and provider limitations.
+
 ## Architecture
 
 ```mermaid
@@ -66,6 +68,7 @@ The main boundaries are deliberately small:
 - `apps/demo` owns honest localhost fixtures and their visible simulated hostnames.
 - `apps/extension` owns user activation, evidence presentation, explicit approval, and short-lived state.
 - `apps/local-service` owns the API key and optional GPT-5.6 Responses API call.
+- The same loopback service owns Gmail/Outlook OAuth tokens and normalizes a bounded recent-message set; tokens never enter the extension bundle.
 - The model never returns or influences an allow/warn/block decision.
 
 ## Synthetic inbox
@@ -152,7 +155,7 @@ The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 
 Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
 
-Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.1.0`) runs the complete `npm run verify` release gate, packages the extension, records the ZIP and SHA-256 file as workflow artifacts, and publishes both files to the matching GitHub Release. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.1`) runs the complete `npm run verify` release gate, packages the extension, records the ZIP and SHA-256 file as workflow artifacts, and publishes both files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
 Download the latest verified extension package and its checksum from [GitHub Releases](https://github.com/lzongren/contextfill/releases/latest).
 
@@ -185,7 +188,7 @@ The popup and judge lab use semantic labels, keyboard-operable native controls, 
 ## Honest limitations
 
 - This is a hackathon prototype, not phishing-proof or production-ready.
-- Synthetic fixtures are the only inbox provider. Gmail OAuth is intentionally out of scope.
+- Gmail and Outlook require a locally configured OAuth application and running companion service. Tokens are session-only until OS-keychain persistence is implemented.
 - Sender addresses are evidence, not cryptographic proof of email authentication.
 - Lookalike detection covers exact registrable-domain mismatch plus a controlled set of Unicode, punycode, substitution, hyphen, and deceptive-label signals. It does not detect every homograph.
 - Field detection does not traverse iframes or closed shadow roots and cannot support every framework-controlled input.

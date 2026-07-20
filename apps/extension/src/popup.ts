@@ -8,6 +8,20 @@ import {
   type RankedCandidate,
 } from '../../../packages/core/src/index.js';
 import { enhanceCandidatesWithModel } from './model-client.js';
+import {
+  beginMailConnection,
+  disconnectMailProvider,
+  fetchMailboxMessages,
+  getMailProviderStatus,
+  loadMailSource,
+  loadRealMailModelOptIn,
+  MailClientError,
+  saveMailSource,
+  saveRealMailModelOptIn,
+  sourceLabel,
+  type MailProvider,
+  type MailSource,
+} from './mail-client.js';
 import type {
   BackgroundRequest,
   BackgroundResponse,
@@ -18,6 +32,8 @@ import type {
 const app = document.querySelector<HTMLElement>('#app')!;
 let selected: { ranked: RankedCandidate; page: PageContext } | null = null;
 let clearTimer: ReturnType<typeof setTimeout> | null = null;
+let mailSource: MailSource = 'synthetic';
+let realMailModelOptIn = false;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -37,8 +53,11 @@ function shell(): { body: HTMLElement; footer: HTMLElement } {
   const mark = element('span', 'brand-mark');
   mark.setAttribute('aria-hidden', 'true');
   brand.append(mark, element('strong', '', 'ContextFill'));
-  const privacy = element('span', 'privacy-label', 'Local-first');
-  header.append(brand, privacy);
+  const source = element('button', 'source-button', sourceLabel(mailSource));
+  source.type = 'button';
+  source.setAttribute('aria-label', `Message source: ${sourceLabel(mailSource)}. Change source.`);
+  source.addEventListener('click', () => void renderMailSources());
+  header.append(brand, source);
   const body = element('section', 'app-body');
   const footer = element('footer', 'app-footer');
   footer.append(element('span', '', 'Explicit fill only'), element('span', '', 'Never submits'));
@@ -53,7 +72,7 @@ function renderLoading(): void {
   body.append(
     element('p', 'kicker', 'Checking context'),
     element('h1', '', 'Looking for a trusted match…'),
-    element('p', 'muted', 'Scanning this page and the built-in synthetic inbox.'),
+    element('p', 'muted', `Scanning this page and ${sourceLabel(mailSource)}.`),
     spinner,
   );
 }
@@ -177,9 +196,11 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
   const extraction = element(
     'p',
     'extraction-note',
-    ranked.candidate.extractionMethod === 'gpt-5.6'
-      ? 'GPT-5.6 extracted message facts · deterministic policy decided'
-      : 'Deterministic fallback active · no API key required',
+    `${sourceLabel(mailSource)} · ${
+      ranked.candidate.extractionMethod === 'gpt-5.6'
+        ? 'GPT-5.6 extracted message facts · deterministic policy decided'
+        : 'Deterministic extraction · policy decided locally'
+    }`,
   );
   const actions = element('div', 'actions');
   const dismiss = element('button', 'button button--secondary', 'Dismiss');
@@ -223,6 +244,161 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
   if (simulation) body.append(simulation);
   body.append(extraction, actions);
   scheduleClear(ranked);
+}
+
+function sourceAction(label: string, primary = false): HTMLButtonElement {
+  const button = element(
+    'button',
+    `button ${primary ? 'button--primary' : 'button--secondary'}`,
+    label,
+  );
+  button.type = 'button';
+  return button;
+}
+
+function sourceCard(
+  title: string,
+  status: string,
+  copy: string,
+): { card: HTMLDivElement; actions: HTMLDivElement } {
+  const card = element('div', 'source-card');
+  const heading = element('div', 'source-card__heading');
+  heading.append(element('strong', '', title), element('span', 'source-status', status));
+  const actions = element('div', 'source-card__actions');
+  card.append(heading, element('p', 'muted', copy), actions);
+  return { card, actions };
+}
+
+async function chooseSource(source: MailSource): Promise<void> {
+  mailSource = source;
+  await saveMailSource(source);
+  await scan();
+}
+
+async function connectProvider(provider: MailProvider): Promise<void> {
+  try {
+    await saveMailSource(provider);
+    mailSource = provider;
+    const authorizationUrl = await beginMailConnection(provider);
+    await chrome.tabs.create({ url: authorizationUrl });
+    renderMessage(
+      'success',
+      `Finish connecting ${sourceLabel(provider)}`,
+      'Complete the provider consent screen, then reopen ContextFill on the page requesting a code.',
+    );
+  } catch (error) {
+    renderMessage(
+      'error',
+      `Could not connect ${sourceLabel(provider)}`,
+      error instanceof Error ? error.message : 'The local companion service is unavailable.',
+    );
+  }
+}
+
+async function renderMailSources(): Promise<void> {
+  if (clearTimer) clearTimeout(clearTimer);
+  clearTimer = null;
+  selected = null;
+  const { body } = shell();
+  body.append(
+    element('p', 'kicker', 'Message source'),
+    element('h1', '', 'Choose where codes come from'),
+    element(
+      'p',
+      'muted',
+      'Mailbox access stays in the loopback companion service. ContextFill requests read-only mail access and still requires explicit fill approval.',
+    ),
+  );
+
+  const demo = sourceCard(
+    'Demo inbox',
+    mailSource === 'synthetic' ? 'Using' : 'Available',
+    'Bundled synthetic messages for the judge scenarios. No account connection required.',
+  );
+  const useDemo = sourceAction(mailSource === 'synthetic' ? 'Using demo inbox' : 'Use demo inbox');
+  useDemo.disabled = mailSource === 'synthetic';
+  useDemo.addEventListener('click', () => void chooseSource('synthetic'));
+  demo.actions.append(useDemo);
+  body.append(demo.card);
+
+  try {
+    const statuses = await getMailProviderStatus();
+    for (const status of statuses) {
+      const label = sourceLabel(status.provider);
+      const state = status.connected
+        ? mailSource === status.provider
+          ? 'Using'
+          : 'Connected'
+        : status.configured
+          ? 'Ready to connect'
+          : 'Needs setup';
+      const copy = status.connected
+        ? `Connected${status.account ? ` as ${status.account}` : ''}. Authorization is held only while the companion service is running.`
+        : status.configured
+          ? `Connect ${label} with read-only mail access. ContextFill fetches only recent verification-like messages.`
+          : `Add the ${label} OAuth client settings to .env, then restart the companion service.`;
+      const providerCard = sourceCard(label, state, copy);
+      if (status.connected) {
+        const use = sourceAction(
+          mailSource === status.provider ? `Using ${label}` : `Use ${label}`,
+          mailSource !== status.provider,
+        );
+        use.disabled = mailSource === status.provider;
+        use.addEventListener('click', () => void chooseSource(status.provider));
+        const disconnect = sourceAction('Disconnect');
+        disconnect.addEventListener('click', () => {
+          void (async () => {
+            await disconnectMailProvider(status.provider);
+            if (mailSource === status.provider) {
+              mailSource = 'synthetic';
+              await saveMailSource('synthetic');
+            }
+            await renderMailSources();
+          })();
+        });
+        providerCard.actions.append(use, disconnect);
+      } else {
+        const connect = sourceAction(`Connect ${label}`, true);
+        connect.disabled = !status.configured;
+        connect.addEventListener('click', () => void connectProvider(status.provider));
+        providerCard.actions.append(connect);
+      }
+      body.append(providerCard.card);
+    }
+  } catch (error) {
+    const unavailable = sourceCard(
+      'Companion service',
+      'Unavailable',
+      error instanceof Error
+        ? error.message
+        : 'Start the local service to configure a real mailbox.',
+    );
+    body.append(unavailable.card);
+  }
+
+  const model = sourceCard(
+    'GPT-5.6 for real mail',
+    realMailModelOptIn ? 'Enabled' : 'Local-only',
+    realMailModelOptIn
+      ? 'One prefiltered message at a time may be sent through your configured OpenAI API for fact extraction. Deterministic policy still decides.'
+      : 'Real Gmail and Outlook messages use deterministic extraction and stay local. The synthetic demo can still exercise GPT-5.6.',
+  );
+  const toggleModel = sourceAction(
+    realMailModelOptIn ? 'Disable for real mail' : 'Enable for real mail',
+  );
+  toggleModel.addEventListener('click', () => {
+    void (async () => {
+      realMailModelOptIn = !realMailModelOptIn;
+      await saveRealMailModelOptIn(realMailModelOptIn);
+      await renderMailSources();
+    })();
+  });
+  model.actions.append(toggleModel);
+  body.append(model.card);
+
+  const back = sourceAction('Back to scan');
+  back.addEventListener('click', () => void scan());
+  body.append(back);
 }
 
 async function fillSelected(warningOverride: boolean): Promise<void> {
@@ -271,9 +447,15 @@ async function scan(): Promise<void> {
     if (!response.ok || !response.page)
       throw new Error(response.ok ? 'Page context was unavailable.' : response.error);
     const page = pageContextSchema.parse(response.page);
-    const messages = messagesForScenario(page.scenario);
+    const messages =
+      mailSource === 'synthetic'
+        ? messagesForScenario(page.scenario)
+        : await fetchMailboxMessages(mailSource);
     const deterministic = extractInboxDeterministic(messages);
-    const enhanced = await enhanceCandidatesWithModel(messages, deterministic);
+    const enhanced =
+      mailSource === 'synthetic' || realMailModelOptIn
+        ? await enhanceCandidatesWithModel(messages, deterministic)
+        : { candidates: deterministic, modelUsed: false, fallbackReason: null };
     const usedResponse = await backgroundMessage({ type: 'GET_USED_CANDIDATES' });
     const usedCandidateIds = new Set(usedResponse.ok ? usedResponse.candidateIds : []);
     const ranked = rankCandidates(enhanced.candidates, page, { usedCandidateIds });
@@ -282,7 +464,7 @@ async function scan(): Promise<void> {
       renderMessage(
         'empty',
         'No usable verification code',
-        'The synthetic inbox contains no recent verification candidate for this fixture.',
+        `${sourceLabel(mailSource)} contains no recent verification candidate for this page.`,
       );
       return;
     }
@@ -295,11 +477,19 @@ async function scan(): Promise<void> {
   } catch (error) {
     renderMessage(
       'error',
-      'ContextFill cannot inspect this tab',
+      error instanceof MailClientError
+        ? `Could not read ${sourceLabel(mailSource)}`
+        : 'ContextFill cannot inspect this tab',
       error instanceof Error ? error.message : 'Open a normal webpage and try again.',
     );
   }
 }
 
 window.addEventListener('unload', () => clearSensitiveState('dismiss'));
-void scan();
+void (async () => {
+  [mailSource, realMailModelOptIn] = await Promise.all([
+    loadMailSource(),
+    loadRealMailModelOptIn(),
+  ]);
+  await scan();
+})();

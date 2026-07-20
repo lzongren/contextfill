@@ -2,7 +2,7 @@
 
 ## Scope
 
-This review covers the Chrome MV3 extension, synthetic fixtures, loopback GPT-5.6 companion service, deterministic core, and localhost judge pages. ContextFill is a hackathon prototype that demonstrates a safer transfer interaction; it is not a production authentication control.
+This review covers the Chrome MV3 extension, synthetic fixtures, Gmail and Outlook connectors, loopback companion service, deterministic core, and localhost judge pages. ContextFill is evolving toward personal real-mailbox use; it is not a production authentication control.
 
 ## Assets
 
@@ -10,18 +10,20 @@ This review covers the Chrome MV3 extension, synthetic fixtures, loopback GPT-5.
 - The relationship between a message, service, and requesting site.
 - The user's explicit consent to reveal or fill.
 - The optional OpenAI API key.
+- Gmail and Microsoft OAuth access and refresh tokens.
 - Integrity of the deterministic policy and replay state.
 - Privacy of inbox and browsing context.
 
 ## Trust boundaries
 
 1. **Webpage → isolated content script:** the page DOM, labels, metadata, and fields are untrusted. Only localhost may provide a simulated hostname.
-2. **Synthetic message → extraction:** subject, body, sender, URLs, and any instructions in a message are untrusted data.
+2. **Mailbox provider or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, and any instructions in a message are untrusted data.
 3. **Extension popup → content script:** only an explicit popup action carries a value to a currently detected field.
-4. **Popup → loopback service:** only prefiltered synthetic messages are sent to a fixed loopback endpoint.
-5. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
-6. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
-7. **Policy → mutation:** an allow decision, or an acknowledged warn decision, is required before filling. Block cannot be overridden.
+4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require the exact configured extension origin.
+5. **Loopback service → Gmail/Microsoft APIs:** PKCE OAuth tokens remain in service memory; only bounded recent-message queries are made with delegated read-only scopes.
+6. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
+7. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
+8. **Policy → mutation:** an allow decision, or an acknowledged warn decision, is required before filling. Block cannot be overridden.
 
 ## Threats and mitigations
 
@@ -79,13 +81,21 @@ This review covers the Chrome MV3 extension, synthetic fixtures, loopback GPT-5.
 
 **Mitigations:** Explicit `expiresAt` at or before the current time blocks. Messages older than the 15-minute window block. Expired values are removed from retained confirmation state immediately.
 
-**Residual risk:** Real providers use varying validity windows, and an absent/incorrect message expiry would require provider-specific policy.
+**Residual risk:** Real providers use varying validity wording. The connectors infer common minute/hour phrases, but absent or unusual expiry evidence still falls back to the general freshness window.
+
+### Mailbox OAuth token theft or provider overreach
+
+**Threat:** A local attacker steals a refresh token, a connector requests write access, or an API response causes broad mailbox disclosure.
+
+**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. Tokens remain in service memory and clear on restart. Gmail searches one day of verification-like mail and retrieves at most 12 bodies; Outlook filters 25 recent messages to at most 10 verification-like results. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
+
+**Residual risk:** Local malware can inspect process memory. Gmail's scope still permits broad read access and requires provider review for public distribution. OS-keychain-backed refresh-token persistence, provider audit verification, and per-install service authentication remain required before general release.
 
 ### Sensitive logs, clipboard, storage, and analytics
 
 **Threat:** A full code leaks through console output, clipboard, persistent extension storage, telemetry, or screenshots.
 
-**Mitigations:** Production code does not log codes, never touches the clipboard, has no analytics, requests no storage permission, masks values by default, disallows reveal on blocks, and clears popup state after fill/dismiss/expiry/90 seconds. Only synthetic values exist in fixtures and tests.
+**Mitigations:** Production code does not log codes, never touches the clipboard, and has no analytics. Extension storage contains only the selected source name; codes, message bodies, and OAuth tokens are excluded. Values are masked by default, cannot be revealed on blocks, and clear from popup state after fill/dismiss/expiry/90 seconds. OAuth tokens remain in companion-service memory only.
 
 **Residual risk:** A user can intentionally reveal or photograph a code. Browser developer tooling can inspect extension memory while it is active.
 
@@ -109,9 +119,9 @@ This review covers the Chrome MV3 extension, synthetic fixtures, loopback GPT-5.
 
 **Threat:** A malicious website calls the local service to spend API quota or exfiltrate message content.
 
-**Mitigations:** The server binds to `127.0.0.1`, accepts only extension origins with valid ID syntax or the known demo origin, uses no credentials/cookies, sets `no-store`, rejects payloads above 12 KB, truncates model content to 4,000 characters, and exposes no arbitrary URL fetch.
+**Mitigations:** The server binds to `127.0.0.1`, uses no cookies, sets `no-store`, rejects model payloads above 12 KB, truncates model content to 4,000 characters, and exposes no arbitrary URL fetch. Mail status, connection, disconnection, and message endpoints require the exact extension ID configured in the local environment; OAuth callbacks require one-time random state.
 
-**Residual risk:** Browser origins are not strong client authentication. Production would require a per-install capability token, HTTPS-equivalent secure local transport, tighter rate limits, and request accounting.
+**Residual risk:** Exact extension origin is stronger than a generic CORS allowlist but is not a secret. Production still needs a per-install capability token, HTTPS-equivalent secure local transport, tighter rate limits, and request accounting.
 
 ### Automatic submission or unintended page mutation
 
@@ -123,15 +133,16 @@ This review covers the Chrome MV3 extension, synthetic fixtures, loopback GPT-5.
 
 ### Accidental private data in fixtures or media
 
-**Threat:** A personal email, key, browser profile, or unrelated tab appears in screenshots or the public repository.
+**Threat:** A personal email, OAuth consent screen, key, browser profile, or unrelated tab appears in screenshots or the public repository.
 
-**Mitigations:** All messages, brands, domains, names, and codes are synthetic. The screenshot plan calls for a clean browser profile and excludes keys, profile chrome, personal tabs, and inbox UI. No real inbox integration exists.
+**Mitigations:** Committed fixtures remain synthetic. The screenshot plan calls for a clean browser profile and excludes keys, provider account identifiers, profile chrome, personal tabs, and inbox UI. Real-mail testing must not be used for public hackathon media.
 
 ## Explicit non-goals
 
 - Claiming phishing-proof, complete homograph detection, or production readiness.
 - Verifying mailbox transport authentication or sender account integrity.
-- Gmail OAuth, personal mailbox access, or hosted multi-user service.
+- Hosted multi-user mailbox service or server-side storage of user mail.
+- Persistent OAuth tokens before OS-keychain storage and per-install pairing are implemented.
 - Password capture, password-manager behavior, clipboard management, or automatic navigation.
 - Iframe, cross-origin frame, or closed shadow-root field support.
 - Magic-link opening, order references, or booking references in the P0/P1 release.

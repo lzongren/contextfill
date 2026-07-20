@@ -76,7 +76,7 @@ input:focus-visible {
   box-shadow: inset 0 0 0 5px #173e35;
 }
 
-.privacy-label,
+.source-status,
 .field-label,
 .kicker,
 .trust-label {
@@ -87,12 +87,15 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
-.privacy-label {
+.source-button {
   padding: 5px 8px;
   border: 1px solid #bcc7bb;
   border-radius: 99px;
   color: #5e6e68;
   background: rgba(255, 255, 255, 0.54);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .app-body {
@@ -250,6 +253,38 @@ input:focus-visible {
   border-radius: 8px;
   font-size: 10px;
   line-height: 1.45;
+}
+
+.source-card {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #ccd3ca;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.source-card__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.source-status {
+  color: #567d17;
+  text-align: right;
+}
+
+.source-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.source-card__actions .button {
+  min-height: 34px;
 }
 
 .simulation-note {

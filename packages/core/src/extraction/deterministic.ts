@@ -7,11 +7,11 @@ import {
 } from '../types.js';
 
 const verificationLanguage =
-  /\b(verification|verify|one[- ]time|security code|sign[- ]?in code|login code|temporary code|authentication code|otp)\b/i;
+  /\b(verification|verify|one[- ]time|security code|sign[- ]?in code|login code|temporary code|authentication code|auth code|access code|confirmation code|passcode|two[- ]factor|2fa|otp)\b/i;
 const unrelatedLanguage = /\b(order|receipt|invoice|tracking|street|lane|customer care|phone)\b/i;
 const magicLinkLanguage = /\b(magic link|sign[- ]?in link|login link)\b/i;
 const codeAfterLanguage =
-  /(?:verification|one[- ]time|security|sign[- ]?in|login|temporary|authentication|otp)\s+(?:code\s+)?(?:is\s+|:\s*|#\s*)?([A-Z0-9]{4,10})\b/i;
+  /(?:verification|one[- ]time|security|sign[- ]?in|login|temporary|authentication|auth|access|confirmation|two[- ]factor|2fa|otp)\s+(?:code|passcode)?\s*(?:is\s+|:\s*|#\s*)?([A-Z0-9]{4,10})\b/i;
 const plainCode = /\b([A-Z0-9]{6,8})\b/g;
 const domainPattern = /\b(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,63})(?:[/:?#]|\b)/gi;
 
