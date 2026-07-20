@@ -48,5 +48,5 @@ No live OpenAI API key was configured during the release run. Model behavior was
 
 - Primary `/feedback` Session ID: **TODO — run `/feedback` in this primary Codex session and paste the real ID.**
 - Confirmed Codex session model: **TODO — copy from the real session metadata; do not infer.**
-- Repository URL: **TODO**
+- Repository URL: [https://github.com/lzongren/contextfill](https://github.com/lzongren/contextfill)
 - Final commit: use the repository's submitted `HEAD`; confirm after any human edits.

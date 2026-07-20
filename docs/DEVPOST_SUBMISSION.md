@@ -109,7 +109,7 @@ Load `dist/extension` as an unpacked Chrome extension. Run `?scenario=legitimate
 
 ## Links — replace before submission
 
-- Repository URL: **TODO**
+- Repository URL: [https://github.com/lzongren/contextfill](https://github.com/lzongren/contextfill)
 - Public demo URL, if created: **TODO or “Local judge lab only”**
 - Public YouTube demo under three minutes: **TODO**
 - Primary Codex `/feedback` Session ID: **TODO — use the real ID from this session**

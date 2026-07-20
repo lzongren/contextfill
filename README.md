@@ -1,5 +1,7 @@
 # ContextFill
 
+[![CI](https://github.com/lzongren/contextfill/actions/workflows/ci.yml/badge.svg)](https://github.com/lzongren/contextfill/actions/workflows/ci.yml)
+
 > ContextFill securely brings temporary information from a trusted message to the page requesting it, while verifying that the message and website belong together.
 
 ContextFill is a privacy-first Chrome extension prototype for OpenAI Build Week. It finds verification codes in a built-in synthetic inbox, compares message evidence with the requesting page, explains an **allow**, **warn**, or **block** decision, and fills only after the user explicitly approves. It never submits the form.

@@ -15,4 +15,5 @@
 - [x] Passed the final `npm run verify` release gate.
 - [x] Produced and integrity-tested `artifacts/contextfill-extension-v0.1.0.zip`.
 - [x] Confirmed the extension bundle contains no API-key references, only `.env.example` exists, and the production dependency audit reports zero vulnerabilities.
-- [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, publish the repository, edit Devpost placeholders, and run `/feedback`.
+- [x] Published the project at `https://github.com/lzongren/contextfill` with CI and public-repository standards.
+- [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.
