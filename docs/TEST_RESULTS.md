@@ -4,6 +4,7 @@ Release candidate checked on 2026-07-20 in the local macOS workspace.
 
 | Check                | Command                                               | Result                                          |
 | -------------------- | ----------------------------------------------------- | ----------------------------------------------- |
+| Fast iteration gate  | `npm run check`                                       | 9 files, 26 tests plus static checks passed     |
 | Unit and integration | `npm test`                                            | 9 files, 26 tests passed                        |
 | TypeScript           | `npm run typecheck`                                   | Passed                                          |
 | ESLint               | `npm run lint`                                        | Passed                                          |

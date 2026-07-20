@@ -138,6 +138,7 @@ npm run demo            # Start judge pages at 127.0.0.1:4173
 npm run service         # Start optional loopback extractor
 npm run dev             # Start both processes
 npm test                # Unit and integration tests
+npm run check           # Fast iteration gate: format, lint, types, unit/integration tests
 npm run test:extension  # Load packaged MV3 extension in Chromium
 npm run test:browser    # Run real-Chrome page acceptance tests
 npm run build           # Production demo, extension, and service builds
@@ -146,6 +147,12 @@ npm run verify          # Format, lint, types, tests, builds, extension load, br
 ```
 
 The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
+
+## CI and releases
+
+Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
+
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.1.0`) runs the complete `npm run verify` release gate, packages the extension, records the ZIP and SHA-256 file as workflow artifacts, and publishes both files to the matching GitHub Release. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
 ## Security and sensitive-data behavior
 

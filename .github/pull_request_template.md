@@ -4,7 +4,8 @@
 
 ## Verification
 
-- [ ] `npm run verify` passes
+- [ ] `npm run check` passes
+- [ ] `npm run verify` passes when browser, extension, release, or trust-sensitive behavior changed
 - [ ] No verification code, API key, or private message was added to logs or screenshots
 - [ ] Security-sensitive behavior remains deterministic and does not auto-submit forms
 
