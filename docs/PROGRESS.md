@@ -19,5 +19,9 @@
 - [x] Split fast iteration CI from full release verification and automated tagged GitHub Release artifacts with checksums.
 - [x] Added provider-neutral mailbox messages, Gmail and Outlook read-only OAuth adapters, bounded recent-message ingestion, source controls, and connector tests.
 - [x] Prepared the real-mailbox connector artifact as `v0.2.0-beta.1`; prerelease tags are labeled as GitHub prereleases.
-- [ ] Complete a live OAuth connection with user-owned Gmail and Outlook app registrations, then add OS-keychain token persistence and per-install loopback pairing.
+- [x] Added OS-keychain refresh-token persistence with explicit session fallback and one-time per-install loopback capability pairing.
+- [x] Verified packaged-extension pairing against a real temporary loopback service, including privileged extension fetches that omit `Origin`.
+- [x] Verified a disposable native macOS Keychain write/read/delete and prepared `v0.2.0-beta.2` with 39 unit/integration tests.
+- [x] Added an installable `contextfill-service` companion package with safe `--init`; tagged releases publish it beside the extension with a separate checksum.
+- [ ] Complete live OAuth connections with user-owned Gmail and Outlook app registrations.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.

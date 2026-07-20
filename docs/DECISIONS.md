@@ -34,6 +34,14 @@ Pull requests and pushes to `main` run formatting, lint, type, and unit/integrat
 
 ## D-009: Mailbox OAuth stays in a loopback companion service
 
-Gmail and Outlook use authorization code flow with PKCE through the existing Node.js companion service. The extension stores only the selected provider, while access and refresh tokens remain in service memory. Provider APIs return a bounded recent-message set that is normalized to the shared mailbox schema before the existing extraction, ranking, deterministic policy, and explicit-fill pipeline. Session-only tokens add reconnection friction but avoid introducing plaintext persistent credentials before OS-keychain support exists.
+Gmail and Outlook use authorization code flow with PKCE through the existing Node.js companion service. Access tokens remain in memory; refresh tokens are stored through the native OS credential manager and automatically fall back to visible session-only behavior if that backend is unavailable. Provider APIs return a bounded recent-message set that is normalized to the shared mailbox schema before the existing extraction, ranking, deterministic policy, and explicit-fill pipeline.
 
 Real mailbox messages use deterministic extraction by default. Model extraction is a separate explicit opt-in because configuring an OpenAI key must not silently cause personal message content to leave the device.
+
+## D-010: Loopback access uses one-time capability pairing
+
+An extension installation generates a random 256-bit capability after the user enters a six-digit code printed by the companion service. The service stores only the capability hash and binds it to the extension ID; subsequent mailbox and model-extraction requests require both. Pairing codes expire after 10 minutes and rate-limit after five failures. This replaces manual extension-ID configuration while providing actual authentication instead of treating a public extension ID as a secret.
+
+## D-011: Releases include an installable companion CLI
+
+Real-mail use must not require a source checkout or TypeScript toolchain. Release tags therefore publish a bundled Node.js companion `.tgz` beside the extension ZIP, with independent checksums. Its only runtime dependency is the platform keyring binding. The `contextfill-service --init` command creates an owner-only `.env` without overwriting an existing file.

@@ -6,16 +6,30 @@ ContextFill can read recent verification-like messages from Gmail or Outlook thr
 
 - Gmail requests only `gmail.readonly`; Outlook requests delegated `Mail.Read` plus basic sign-in scopes.
 - OAuth uses authorization code flow, PKCE, a random 10-minute state value, and an exact loopback callback.
-- Mail endpoints accept only the exact Chrome extension origin configured through `CONTEXTFILL_EXTENSION_ID`.
-- Tokens are held in memory and cleared when the companion service stops. They are never written to the repository, extension storage, logs, or browser bundle.
+- Mail and model-extraction endpoints require a 256-bit per-install capability established with a one-time six-digit terminal code. The service binds it to the extension installation ID and cross-checks the browser `Origin` header whenever Chrome supplies one.
+- Refresh tokens and the hashed service capability are stored in the native macOS Keychain, Windows Credential Manager, or Linux Secret Service through `@napi-rs/keyring`. Access tokens stay in service memory. If the keyring is unavailable, the UI explicitly reports session-only storage.
+- The extension stores only its random pairing capability, selected source, and explicit model opt-in. Chrome storage is restricted to trusted extension contexts; message bodies, codes, provider tokens, and account authorization never enter it.
 - Real mailbox messages use deterministic local extraction by default. Sending a prefiltered real message through the optional GPT-5.6 extractor requires a separate explicit toggle in the source screen.
 - Gmail queries only verification-like messages from the last day and fetches at most 12 bodies. Outlook reads 25 recent summaries, filters locally, then retrieves at most 12 verification-like bodies before returning at most 10 messages.
-- Disconnect clears the in-memory token and makes a best-effort Google revocation request.
+- Disconnect clears memory, deletes the keychain refresh credential, and makes a best-effort Google revocation request.
 - ContextFill still shows an allow/warn/block decision and requires explicit user approval. It never submits the form.
 
-The session-only token policy is deliberate until OS-keychain persistence is implemented. Restarting the companion service therefore requires reconnecting the mailbox.
-
 ## Common setup
+
+### Install a release
+
+1. Download the extension ZIP, companion `.tgz`, and both checksum files from the same [GitHub Release](https://github.com/lzongren/contextfill/releases). Verify both artifacts.
+2. Unzip the extension, then load that directory through `chrome://extensions` with Developer mode enabled.
+3. Install the companion package and create a private runtime configuration:
+
+   ```bash
+   npm install --global ./contextfill-companion-v0.2.0-beta.2.tgz
+   mkdir contextfill-runtime
+   cd contextfill-runtime
+   contextfill-service --init
+   ```
+
+### Run from source
 
 1. Install dependencies and build the extension:
 
@@ -25,25 +39,37 @@ The session-only token policy is deliberate until OS-keychain persistence is imp
    ```
 
 2. Load `dist/extension` through `chrome://extensions` with Developer mode enabled.
-3. Copy the extension's 32-character ID from `chrome://extensions`.
-4. Copy `.env.example` to `.env` and set:
+
+### Configure and connect
+
+1. In the runtime directory, edit the generated `.env` (or copy `.env.example` when running from source) and keep the callback origin:
 
    ```dotenv
-   CONTEXTFILL_EXTENSION_ID=your_extension_id
    CONTEXTFILL_OAUTH_REDIRECT_ORIGIN=http://localhost:4318
    ```
 
-5. Configure at least one provider below.
-6. Start the companion service:
+2. Configure at least one provider below.
+3. Start the companion service:
 
    ```bash
-   npm run service
+   contextfill-service
    ```
 
-7. Open ContextFill, click the message-source button in the header, connect Gmail or Outlook, and finish the provider consent flow in the new tab.
-8. Reopen ContextFill on a real page requesting a verification code and select the connected mailbox as the source.
+   From a source checkout, use `npm run service` instead.
+
+4. Copy the six-digit pairing code printed in the terminal. Open ContextFill, click the message-source button, enter the code, and click **Pair service**. The code is single-use and expires after 10 minutes.
+5. Connect Gmail or Outlook and finish the provider consent flow in the new tab.
+6. Reopen ContextFill on a real page requesting a verification code and select the connected mailbox as the source. A service restart restores the refresh authorization from the OS keychain.
 
 Leave **GPT-5.6 for real mail** disabled if message bodies must remain on the device. Enabling it allows one prefiltered message at a time to pass from the loopback service to the configured OpenAI API with `store: false`; deterministic code still makes every allow/warn/block decision.
+
+### Pairing and keychain recovery
+
+The terminal code bootstraps one extension installation. The raw 256-bit capability stays in trusted extension storage; only its SHA-256 hash is stored by the service. Five failed guesses rate-limit pairing until restart.
+
+If the browser capability is lost or you intentionally want to pair another installation, set `CONTEXTFILL_PAIRING_RESET=1`, start the service once, pair with the newly printed code, then return the setting to `0`. `CONTEXTFILL_EXTENSION_ID` remains only as a compatibility option for the first connector beta and should normally be left empty.
+
+Keychain failure does not break the connector, but both pairing and provider authorization become session-only and must be repeated after the service stops. The source screen makes that downgrade visible.
 
 ## Gmail
 
@@ -92,6 +118,7 @@ Official references: [authorization code flow with PKCE](https://learn.microsoft
 ## Failure behavior
 
 - If the service is stopped, the extension explains that the mailbox source is unavailable; it does not silently switch to another real account.
-- If access expires or is revoked, the service clears the invalid session and requires a new connection.
+- If access expires or is revoked, the service requires a new provider connection. Disconnect deletes the keychain credential and reports an error instead of claiming success if durable deletion fails.
+- If the extension loses its pairing capability, restart once with `CONTEXTFILL_PAIRING_RESET=1` and pair again.
 - If provider output is malformed, message normalization rejects it before extraction.
 - The synthetic demo inbox remains available as an explicit source for development and regression testing.

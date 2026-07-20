@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   syntheticMessageSchema,
   type SyntheticMessage,
@@ -11,6 +11,7 @@ import {
   mailProviderSchema,
   type MailboxManagerLike,
 } from './mailbox.js';
+import { createPairingManager, type PairingManager } from './pairing.js';
 
 type Extractor = (message: SyntheticMessage) => Promise<VerificationCandidate>;
 
@@ -26,6 +27,7 @@ const allowedOrigin = (origin: string | undefined): boolean => {
 export function createServiceApp(
   extractor: Extractor = extractWithGpt,
   mailbox: MailboxManagerLike = createMailboxManager(),
+  pairing: PairingManager = createPairingManager(),
 ) {
   const app = new Hono();
   app.use('*', async (context, next) => {
@@ -37,7 +39,10 @@ export function createServiceApp(
     context.header('X-Content-Type-Options', 'nosniff');
     if (context.req.method === 'OPTIONS') {
       context.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-      context.header('Access-Control-Allow-Headers', 'content-type');
+      context.header(
+        'Access-Control-Allow-Headers',
+        'content-type, x-contextfill-extension-id, x-contextfill-pairing',
+      );
       return context.body(null, 204);
     }
     await next();
@@ -51,25 +56,6 @@ export function createServiceApp(
     }),
   );
 
-  const requireMailboxOrigin = (origin: string | undefined): MailboxError | null => {
-    const extensionId = process.env.CONTEXTFILL_EXTENSION_ID?.trim();
-    if (!extensionId || !/^[a-p]{32}$/.test(extensionId)) {
-      return new MailboxError(
-        'provider_not_configured',
-        'CONTEXTFILL_EXTENSION_ID must match the unpacked Chrome extension ID.',
-        503,
-      );
-    }
-    if (origin !== `chrome-extension://${extensionId}`) {
-      return new MailboxError(
-        'provider_not_configured',
-        'This extension origin is not paired with the local service.',
-        403,
-      );
-    }
-    return null;
-  };
-
   const mailboxError = (error: unknown): { error: string; message: string; status: number } => {
     if (error instanceof MailboxError) {
       return { error: error.code, message: error.message, status: error.status };
@@ -81,25 +67,72 @@ export function createServiceApp(
     };
   };
 
-  app.get('/mail/status', (context) => {
-    const originError = requireMailboxOrigin(context.req.header('origin'));
-    if (originError) {
-      const failure = mailboxError(originError);
+  const pairingSecret = (header: string | undefined): string | undefined => {
+    return header?.trim() || undefined;
+  };
+
+  const extensionOrigin = (context: Context): string | undefined => {
+    const origin = context.req.header('origin');
+    const extensionId = context.req.header('x-contextfill-extension-id')?.trim();
+    const headerOrigin =
+      extensionId && /^[a-p]{32}$/.test(extensionId)
+        ? `chrome-extension://${extensionId}`
+        : undefined;
+    if (origin && /^chrome-extension:\/\/[a-p]{32}$/.test(origin)) {
+      return headerOrigin && headerOrigin !== origin ? undefined : origin;
+    }
+    return origin ? undefined : headerOrigin;
+  };
+
+  app.get('/pair/status', async (context) => {
+    const origin = extensionOrigin(context);
+    if (!origin) {
+      return context.json({ error: 'invalid_extension_origin' }, 403);
+    }
+    return context.json({
+      pairing: await pairing.status(
+        origin,
+        pairingSecret(context.req.header('x-contextfill-pairing')),
+      ),
+    });
+  });
+
+  app.post('/pair', async (context) => {
+    const body = (await context.req.json().catch(() => null)) as Record<string, unknown> | null;
+    const result = await pairing.pair(
+      extensionOrigin(context),
+      typeof body?.code === 'string' ? body.code : '',
+      typeof body?.secret === 'string' ? body.secret : '',
+    );
+    if (!result.ok) {
+      return context.json({ error: result.error, message: result.message }, result.status);
+    }
+    return context.json({ ok: true });
+  });
+
+  app.get('/mail/status', async (context) => {
+    const authorization = await pairing.authorize(
+      extensionOrigin(context),
+      pairingSecret(context.req.header('x-contextfill-pairing')),
+    );
+    if (!authorization.ok) {
       return context.json(
-        { error: failure.error, message: failure.message },
-        failure.status as 403,
+        { error: authorization.error, message: authorization.message },
+        authorization.status,
       );
     }
-    return context.json({ providers: mailbox.statuses() });
+    return context.json({ providers: await mailbox.statuses() });
   });
 
   app.post('/mail/connect/:provider', async (context) => {
-    const originError = requireMailboxOrigin(context.req.header('origin'));
-    if (originError) {
-      const failure = mailboxError(originError);
+    const authorization = await pairing.authorize(
+      extensionOrigin(context),
+      pairingSecret(context.req.header('x-contextfill-pairing')),
+    );
+    if (!authorization.ok) {
       return context.json(
-        { error: failure.error, message: failure.message },
-        failure.status as 403,
+        { error: authorization.error, message: authorization.message },
+        authorization.status,
       );
     }
     const provider = mailProviderSchema.safeParse(context.req.param('provider'));
@@ -116,27 +149,39 @@ export function createServiceApp(
   });
 
   app.post('/mail/disconnect/:provider', async (context) => {
-    const originError = requireMailboxOrigin(context.req.header('origin'));
-    if (originError) {
-      const failure = mailboxError(originError);
+    const authorization = await pairing.authorize(
+      extensionOrigin(context),
+      pairingSecret(context.req.header('x-contextfill-pairing')),
+    );
+    if (!authorization.ok) {
       return context.json(
-        { error: failure.error, message: failure.message },
-        failure.status as 403,
+        { error: authorization.error, message: authorization.message },
+        authorization.status,
       );
     }
     const provider = mailProviderSchema.safeParse(context.req.param('provider'));
     if (!provider.success) return context.json({ error: 'unsupported_provider' }, 404);
-    await mailbox.disconnect(provider.data);
-    return context.json({ ok: true });
+    try {
+      await mailbox.disconnect(provider.data);
+      return context.json({ ok: true });
+    } catch (error) {
+      const failure = mailboxError(error);
+      return context.json(
+        { error: failure.error, message: failure.message },
+        failure.status as 400,
+      );
+    }
   });
 
   app.get('/mail/messages/:provider', async (context) => {
-    const originError = requireMailboxOrigin(context.req.header('origin'));
-    if (originError) {
-      const failure = mailboxError(originError);
+    const authorization = await pairing.authorize(
+      extensionOrigin(context),
+      pairingSecret(context.req.header('x-contextfill-pairing')),
+    );
+    if (!authorization.ok) {
       return context.json(
-        { error: failure.error, message: failure.message },
-        failure.status as 403,
+        { error: authorization.error, message: authorization.message },
+        authorization.status,
       );
     }
     const provider = mailProviderSchema.safeParse(context.req.param('provider'));
@@ -178,6 +223,16 @@ export function createServiceApp(
   });
 
   app.post('/extract', async (context) => {
+    const authorization = await pairing.authorize(
+      extensionOrigin(context),
+      pairingSecret(context.req.header('x-contextfill-pairing')),
+    );
+    if (!authorization.ok) {
+      return context.json(
+        { error: authorization.error, message: authorization.message },
+        authorization.status,
+      );
+    }
     if (!process.env.OPENAI_API_KEY && extractor === extractWithGpt) {
       return context.json({ fallback: true, reason: 'not_configured' }, 503);
     }

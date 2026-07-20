@@ -15,7 +15,10 @@ await build({
   format: 'esm',
   target: ['node20'],
   sourcemap: true,
-  packages: 'external',
+  external: ['@napi-rs/keyring'],
+  banner: {
+    js: "#!/usr/bin/env node\nimport { createRequire as __contextfillCreateRequire } from 'node:module';\nconst require = __contextfillCreateRequire(import.meta.url);",
+  },
 });
 
 console.log(`Built local service at ${outdir}`);

@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { mailboxMessageSchema, type MailboxMessage } from '../../../packages/core/src/index.js';
+import {
+  createCredentialStore,
+  type CredentialStore,
+  type StoredCredential,
+} from './credential-store.js';
 
 export const mailProviderSchema = z.enum(['gmail', 'outlook']);
 export type MailProvider = z.infer<typeof mailProviderSchema>;
@@ -10,11 +15,12 @@ export type MailProviderStatus = {
   configured: boolean;
   connected: boolean;
   account: string | null;
-  sessionOnly: true;
+  sessionOnly: boolean;
+  credentialStorage: 'os-keychain' | 'session';
 };
 
 export type MailboxManagerLike = {
-  statuses(): MailProviderStatus[];
+  statuses(): Promise<MailProviderStatus[]>;
   beginConnection(provider: MailProvider): Promise<string>;
   completeConnection(provider: MailProvider, code: string, state: string): Promise<string>;
   disconnect(provider: MailProvider): Promise<void>;
@@ -42,6 +48,7 @@ type TokenSet = {
   refreshToken: string | null;
   expiresAt: number;
   account: string | null;
+  persisted: boolean;
 };
 
 type MailboxErrorCode =
@@ -50,7 +57,8 @@ type MailboxErrorCode =
   | 'oauth_exchange_failed'
   | 'mailbox_not_connected'
   | 'mailbox_access_expired'
-  | 'mailbox_api_failed';
+  | 'mailbox_api_failed'
+  | 'credential_store_failed';
 
 export class MailboxError extends Error {
   constructor(
@@ -290,24 +298,33 @@ export function normalizeOutlookMessage(input: unknown): MailboxMessage | null {
 export class MailboxManager implements MailboxManagerLike {
   private readonly pending = new Map<string, PendingAuthorization>();
   private readonly tokens = new Map<MailProvider, TokenSet>();
+  private initialization: Promise<void> | null = null;
+  private keychainAvailable = true;
 
   constructor(
     private readonly environment: NodeJS.ProcessEnv = process.env,
     private readonly fetcher: typeof fetch = fetch,
     private readonly now: () => number = Date.now,
+    private readonly credentialStore: CredentialStore = createCredentialStore(),
   ) {}
 
-  statuses(): MailProviderStatus[] {
+  async statuses(): Promise<MailProviderStatus[]> {
+    await this.initialize();
     return mailProviderSchema.options.map((provider) => ({
       provider,
       configured: this.config(provider) !== null,
       connected: this.tokens.has(provider),
       account: this.tokens.get(provider)?.account ?? null,
-      sessionOnly: true,
+      sessionOnly: !this.tokens.get(provider)?.persisted,
+      credentialStorage:
+        this.keychainAvailable && this.tokens.get(provider)?.persisted !== false
+          ? 'os-keychain'
+          : 'session',
     }));
   }
 
   async beginConnection(provider: MailProvider): Promise<string> {
+    await this.initialize();
     const config = this.requireConfig(provider);
     this.purgePending();
     const state = base64Url(randomBytes(24));
@@ -331,6 +348,7 @@ export class MailboxManager implements MailboxManagerLike {
   }
 
   async completeConnection(provider: MailProvider, code: string, state: string): Promise<string> {
+    await this.initialize();
     this.purgePending();
     const pending = this.pending.get(state);
     this.pending.delete(state);
@@ -347,19 +365,36 @@ export class MailboxManager implements MailboxManagerLike {
     });
     if (config.clientSecret) body.set('client_secret', config.clientSecret);
     const token = await this.exchangeToken(config, body);
-    this.tokens.set(provider, token);
+    let account: string | null = null;
     try {
-      const account = await this.accountLabel(provider, token.accessToken);
-      this.tokens.set(provider, { ...token, account });
-      return account ?? provider;
+      account = await this.accountLabel(provider, token.accessToken);
     } catch {
-      return provider;
+      account = null;
     }
+    const connected = { ...token, account };
+    if (!connected.refreshToken) await this.deletePersisted(provider);
+    connected.persisted = await this.persist(provider, connected);
+    this.tokens.set(provider, connected);
+    return account ?? provider;
   }
 
   async disconnect(provider: MailProvider): Promise<void> {
+    await this.initialize();
     const token = this.tokens.get(provider);
     this.tokens.delete(provider);
+    let deletionError: MailboxError | null = null;
+    try {
+      await this.deletePersisted(provider);
+    } catch (error) {
+      deletionError =
+        error instanceof MailboxError
+          ? error
+          : new MailboxError(
+              'credential_store_failed',
+              'ContextFill could not delete the saved mailbox credential.',
+              500,
+            );
+    }
     if (provider === 'gmail' && token) {
       const value = token.refreshToken ?? token.accessToken;
       await this.fetcher(
@@ -370,9 +405,11 @@ export class MailboxManager implements MailboxManagerLike {
         },
       ).catch(() => undefined);
     }
+    if (deletionError) throw deletionError;
   }
 
   async listMessages(provider: MailProvider): Promise<MailboxMessage[]> {
+    await this.initialize();
     if (provider === 'gmail') return this.listGmailMessages();
     return this.listOutlookMessages();
   }
@@ -429,6 +466,61 @@ export class MailboxManager implements MailboxManagerLike {
     }
   }
 
+  private async initialize(): Promise<void> {
+    if (!this.initialization) {
+      this.initialization = this.restoreCredentials();
+    }
+    await this.initialization;
+  }
+
+  private async restoreCredentials(): Promise<void> {
+    for (const provider of mailProviderSchema.options) {
+      if (!this.config(provider)) continue;
+      try {
+        const stored = await this.credentialStore.load(provider);
+        if (!stored) continue;
+        this.tokens.set(provider, {
+          accessToken: '',
+          refreshToken: stored.refreshToken,
+          expiresAt: 0,
+          account: stored.account,
+          persisted: true,
+        });
+      } catch {
+        this.keychainAvailable = false;
+      }
+    }
+  }
+
+  private async persist(provider: MailProvider, token: TokenSet): Promise<boolean> {
+    if (!token.refreshToken || !this.keychainAvailable) return false;
+    const credential: StoredCredential = {
+      version: 1,
+      refreshToken: token.refreshToken,
+      account: token.account,
+    };
+    try {
+      await this.credentialStore.save(provider, credential);
+      return true;
+    } catch {
+      this.keychainAvailable = false;
+      return false;
+    }
+  }
+
+  private async deletePersisted(provider: MailProvider): Promise<void> {
+    try {
+      await this.credentialStore.delete(provider);
+    } catch {
+      this.keychainAvailable = false;
+      throw new MailboxError(
+        'credential_store_failed',
+        'ContextFill could not delete the saved mailbox credential.',
+        500,
+      );
+    }
+  }
+
   private async exchangeToken(config: OAuthConfig, body: URLSearchParams): Promise<TokenSet> {
     const response = await this.fetcher(config.tokenEndpoint, {
       method: 'POST',
@@ -445,6 +537,7 @@ export class MailboxManager implements MailboxManagerLike {
       refreshToken: parsed.data.refresh_token ?? null,
       expiresAt: this.now() + (parsed.data.expires_in ?? 3600) * 1000,
       account: null,
+      persisted: false,
     };
   }
 
@@ -467,11 +560,13 @@ export class MailboxManager implements MailboxManagerLike {
     if (provider === 'outlook') body.set('scope', config.scopes.join(' '));
     if (config.clientSecret) body.set('client_secret', config.clientSecret);
     const refreshed = await this.exchangeToken(config, body);
-    this.tokens.set(provider, {
+    const next = {
       ...refreshed,
       refreshToken: refreshed.refreshToken ?? current.refreshToken,
       account: current.account,
-    });
+    };
+    next.persisted = await this.persist(provider, next);
+    this.tokens.set(provider, next);
     return refreshed.accessToken;
   }
 

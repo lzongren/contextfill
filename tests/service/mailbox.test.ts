@@ -4,6 +4,7 @@ import {
   normalizeGmailMessage,
   normalizeOutlookMessage,
 } from '../../apps/local-service/src/mailbox.js';
+import { FakeCredentialStore } from './fake-credential-store.js';
 
 const now = new Date('2026-07-20T19:00:00.000Z');
 
@@ -80,6 +81,7 @@ describe('mailbox message normalization', () => {
 
 describe('mailbox OAuth and provider adapters', () => {
   it('uses PKCE, read-only Gmail scope, refreshable tokens, and Gmail message APIs', async () => {
+    const credentialStore = new FakeCredentialStore();
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url === 'https://oauth2.googleapis.com/token') {
@@ -106,6 +108,7 @@ describe('mailbox OAuth and provider adapters', () => {
       },
       fetcher as typeof fetch,
       () => now.getTime(),
+      credentialStore,
     );
 
     const authorizationUrl = new URL(await manager.beginConnection('gmail'));
@@ -120,16 +123,24 @@ describe('mailbox OAuth and provider adapters', () => {
       authorizationUrl.searchParams.get('state')!,
     );
 
-    expect(manager.statuses()[0]).toMatchObject({
+    expect((await manager.statuses())[0]).toMatchObject({
       provider: 'gmail',
       configured: true,
       connected: true,
+      account: 'person@gmail.example',
+      sessionOnly: false,
+      credentialStorage: 'os-keychain',
+    });
+    expect(await credentialStore.load('gmail')).toEqual({
+      version: 1,
+      refreshToken: 'google-refresh',
       account: 'person@gmail.example',
     });
     expect(await manager.listMessages('gmail')).toHaveLength(1);
   });
 
   it('uses delegated Mail.Read and lists recent Outlook messages through Microsoft Graph', async () => {
+    const credentialStore = new FakeCredentialStore();
     const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/oauth2/v2.0/token')) {
@@ -166,6 +177,7 @@ describe('mailbox OAuth and provider adapters', () => {
       },
       fetcher as typeof fetch,
       () => now.getTime(),
+      credentialStore,
     );
 
     const authorizationUrl = new URL(await manager.beginConnection('outlook'));
@@ -178,12 +190,133 @@ describe('mailbox OAuth and provider adapters', () => {
       authorizationUrl.searchParams.get('state')!,
     );
 
-    expect(manager.statuses()[1]).toMatchObject({
+    expect((await manager.statuses())[1]).toMatchObject({
       provider: 'outlook',
       configured: true,
       connected: true,
       account: 'person@outlook.example',
+      sessionOnly: false,
+      credentialStorage: 'os-keychain',
     });
     expect(await manager.listMessages('outlook')).toHaveLength(1);
+  });
+
+  it('restores a refresh token from the OS keychain and refreshes on first use', async () => {
+    const credentialStore = new FakeCredentialStore();
+    await credentialStore.save('gmail', {
+      version: 1,
+      refreshToken: 'stored-google-refresh',
+      account: 'person@gmail.example',
+    });
+    const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url === 'https://oauth2.googleapis.com/token') {
+        expect(String(init?.body)).toContain('grant_type=refresh_token');
+        expect(String(init?.body)).toContain('refresh_token=stored-google-refresh');
+        return Response.json({ access_token: 'restored-google-access' });
+      }
+      if (url.includes('/users/me/messages?')) {
+        expect(new Headers(init?.headers).get('authorization')).toBe(
+          'Bearer restored-google-access',
+        );
+        return Response.json({ messages: [{ id: 'gmail-message-1' }] });
+      }
+      if (url.includes('/users/me/messages/gmail-message-1?format=full')) {
+        expect(new Headers(init?.headers).get('authorization')).toBe(
+          'Bearer restored-google-access',
+        );
+        return Response.json(gmailMessage());
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const manager = new MailboxManager(
+      {
+        CONTEXTFILL_GOOGLE_CLIENT_ID: 'google-client',
+        CONTEXTFILL_GOOGLE_CLIENT_SECRET: 'google-secret',
+      },
+      fetcher as typeof fetch,
+      () => now.getTime(),
+      credentialStore,
+    );
+
+    expect((await manager.statuses())[0]).toMatchObject({
+      connected: true,
+      account: 'person@gmail.example',
+      sessionOnly: false,
+    });
+    expect(await manager.listMessages('gmail')).toHaveLength(1);
+  });
+
+  it('falls back to session-only authorization when the OS keychain is unavailable', async () => {
+    const credentialStore = new FakeCredentialStore();
+    credentialStore.fail = true;
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return Response.json({ access_token: 'google-access', refresh_token: 'google-refresh' });
+      }
+      if (url.endsWith('/users/me/profile')) {
+        return Response.json({ emailAddress: 'person@gmail.example' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const manager = new MailboxManager(
+      {
+        CONTEXTFILL_GOOGLE_CLIENT_ID: 'google-client',
+        CONTEXTFILL_GOOGLE_CLIENT_SECRET: 'google-secret',
+      },
+      fetcher as typeof fetch,
+      () => now.getTime(),
+      credentialStore,
+    );
+    const authorizationUrl = new URL(await manager.beginConnection('gmail'));
+    await manager.completeConnection(
+      'gmail',
+      'authorization-code',
+      authorizationUrl.searchParams.get('state')!,
+    );
+
+    expect((await manager.statuses())[0]).toMatchObject({
+      connected: true,
+      sessionOnly: true,
+      credentialStorage: 'session',
+    });
+  });
+
+  it('does not report a clean disconnect when the durable credential cannot be deleted', async () => {
+    const credentialStore = new FakeCredentialStore();
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return Response.json({ access_token: 'google-access', refresh_token: 'google-refresh' });
+      }
+      if (url.endsWith('/users/me/profile')) {
+        return Response.json({ emailAddress: 'person@gmail.example' });
+      }
+      if (url.startsWith('https://oauth2.googleapis.com/revoke?')) {
+        return new Response(null, { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const manager = new MailboxManager(
+      {
+        CONTEXTFILL_GOOGLE_CLIENT_ID: 'google-client',
+        CONTEXTFILL_GOOGLE_CLIENT_SECRET: 'google-secret',
+      },
+      fetcher as typeof fetch,
+      () => now.getTime(),
+      credentialStore,
+    );
+    const authorizationUrl = new URL(await manager.beginConnection('gmail'));
+    await manager.completeConnection(
+      'gmail',
+      'authorization-code',
+      authorizationUrl.searchParams.get('state')!,
+    );
+    credentialStore.fail = true;
+
+    await expect(manager.disconnect('gmail')).rejects.toMatchObject({
+      code: 'credential_store_failed',
+    });
   });
 });
