@@ -7,6 +7,12 @@
 - [x] Selected an intentionally small TypeScript architecture with a bundled MV3 extension, Vite demo, shared core, and optional Hono service.
 - [x] Proved the extraction → policy → fill vertical slice with 19 passing unit/integration tests.
 - [x] Added realistic synthetic fixtures, strict schemas, public-suffix-aware parsing, controlled lookalike checks, replay/expiry logic, transparent ranking, and conservative field filling.
-- [ ] Complete extension and demo.
-- [ ] Complete GPT-5.6 service and fallback.
-- [ ] Pass release verification and package.
+- [x] Completed and visually checked the judge lab with explicit localhost simulation.
+- [x] Completed the MV3 popup, active-tab injection, masked confirmation, allow/warn/block states, replay tracking, and 90-second sensitive-state lifecycle.
+- [x] Completed the loopback GPT-5.6 Responses API service, strict schema/evidence validation, no-key health path, and fallback tests.
+- [x] Passed 26 unit/integration tests, 5 installed-Chrome cases, and 1 packaged-extension load test.
+- [x] Completed required README, judge, threat, demo, collaboration, screenshot, test-result, and Devpost draft documentation.
+- [x] Passed the final `npm run verify` release gate.
+- [x] Produced and integrity-tested `artifacts/contextfill-extension-v0.1.0.zip`.
+- [x] Confirmed the extension bundle contains no API-key references, only `.env.example` exists, and the production dependency audit reports zero vulnerabilities.
+- [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, publish the repository, edit Devpost placeholders, and run `/feedback`.

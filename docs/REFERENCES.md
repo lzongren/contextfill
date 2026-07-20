@@ -7,5 +7,7 @@ Checked 2026-07-20.
 - [Official OpenAI JavaScript SDK](https://github.com/openai/openai-node) — Responses API client usage.
 - [Chrome activeTab permission](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab)
 - [Chrome scripting API](https://developer.chrome.com/docs/extensions/reference/api/scripting)
+- [Chrome cross-origin extension requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)
+- [Chrome permission declarations](https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions)
 - [Manifest V3 overview](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 - [tldts](https://github.com/remusao/tldts) — public-suffix-aware hostname parsing.

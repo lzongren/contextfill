@@ -72,7 +72,9 @@ export function findVerificationFields(document: Document): FieldTarget | null {
   const single = singles[0]
     ? { kind: 'single' as const, elements: [singles[0].input], score: singles[0].score }
     : null;
-  if (split && (!single || split.score >= single.score)) return split;
+  // A contextual group of 4–8 adjacent one-character controls is more specific
+  // than the autocomplete signal on its first member.
+  if (split) return split;
   return single;
 }
 

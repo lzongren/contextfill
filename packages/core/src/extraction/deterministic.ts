@@ -81,7 +81,7 @@ export function extractDeterministic(messageInput: SyntheticMessage): Verificati
   const type = code ? 'otp' : 'magic_link';
   const confidence = code ? (codeAfterLanguage.test(text) ? 0.97 : 0.78) : 0.9;
   return verificationCandidateSchema.parse({
-    id: `det:${message.id}`,
+    id: `candidate:${message.id}`,
     messageId: message.id,
     type,
     value: code,

@@ -1,0 +1,305 @@
+import {
+  buildConfirmationViewModel,
+  extractInboxDeterministic,
+  messagesForScenario,
+  pageContextSchema,
+  rankCandidates,
+  type PageContext,
+  type RankedCandidate,
+} from '../../../packages/core/src/index.js';
+import { enhanceCandidatesWithModel } from './model-client.js';
+import type {
+  BackgroundRequest,
+  BackgroundResponse,
+  ContentRequest,
+  ContentResponse,
+} from './shared/messages.js';
+
+const app = document.querySelector<HTMLElement>('#app')!;
+let selected: { ranked: RankedCandidate; page: PageContext } | null = null;
+let clearTimer: ReturnType<typeof setTimeout> | null = null;
+
+function element<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+  text?: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function shell(): { body: HTMLElement; footer: HTMLElement } {
+  app.replaceChildren();
+  const header = element('header', 'app-header');
+  const brand = element('div', 'brand');
+  const mark = element('span', 'brand-mark');
+  mark.setAttribute('aria-hidden', 'true');
+  brand.append(mark, element('strong', '', 'ContextFill'));
+  const privacy = element('span', 'privacy-label', 'Local-first');
+  header.append(brand, privacy);
+  const body = element('section', 'app-body');
+  const footer = element('footer', 'app-footer');
+  footer.append(element('span', '', 'Explicit fill only'), element('span', '', 'Never submits'));
+  app.append(header, body, footer);
+  return { body, footer };
+}
+
+function renderLoading(): void {
+  const { body } = shell();
+  const spinner = element('div', 'spinner');
+  spinner.setAttribute('aria-hidden', 'true');
+  body.append(
+    element('p', 'kicker', 'Checking context'),
+    element('h1', '', 'Looking for a trusted match…'),
+    element('p', 'muted', 'Scanning this page and the built-in synthetic inbox.'),
+    spinner,
+  );
+}
+
+function renderMessage(
+  kind: 'success' | 'error' | 'empty' | 'timeout',
+  title: string,
+  copy: string,
+): void {
+  selected = null;
+  const { body } = shell();
+  const icon = element(
+    'div',
+    `message-icon message-icon--${kind}`,
+    kind === 'success' ? '✓' : kind === 'error' ? '!' : '–',
+  );
+  icon.setAttribute('aria-hidden', 'true');
+  body.append(
+    icon,
+    element('p', 'kicker', kind),
+    element('h1', '', title),
+    element('p', 'muted', copy),
+  );
+  if (kind !== 'success') {
+    const retry = element('button', 'button button--primary', 'Scan again');
+    retry.type = 'button';
+    retry.addEventListener('click', () => void scan());
+    body.append(retry);
+  }
+}
+
+function row(label: string, value: string): HTMLDivElement {
+  const item = element('div', 'evidence-row');
+  item.append(element('dt', '', label), element('dd', '', value));
+  return item;
+}
+
+function clearSensitiveState(reason: 'timeout' | 'dismiss' | 'success'): void {
+  if (clearTimer) clearTimeout(clearTimer);
+  clearTimer = null;
+  selected = null;
+  if (reason === 'timeout') {
+    renderMessage(
+      'timeout',
+      'Sensitive details cleared',
+      'Open ContextFill again to run a fresh scan.',
+    );
+  }
+}
+
+function scheduleClear(candidate: RankedCandidate): void {
+  if (!candidate.candidate.value) return;
+  if (clearTimer) clearTimeout(clearTimer);
+  const expiryDelay = candidate.candidate.expiresAt
+    ? new Date(candidate.candidate.expiresAt).getTime() - Date.now()
+    : Number.POSITIVE_INFINITY;
+  const delay = Math.max(0, Math.min(90_000, expiryDelay));
+  clearTimer = setTimeout(() => clearSensitiveState('timeout'), delay);
+}
+
+async function backgroundMessage(request: BackgroundRequest): Promise<BackgroundResponse> {
+  return (await chrome.runtime.sendMessage(request)) as BackgroundResponse;
+}
+
+async function activeTab(): Promise<chrome.tabs.Tab> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error('No active browser tab is available.');
+  return tab;
+}
+
+async function contentMessage(tabId: number, request: ContentRequest): Promise<ContentResponse> {
+  return (await chrome.tabs.sendMessage(tabId, request)) as ContentResponse;
+}
+
+function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
+  const view = buildConfirmationViewModel(ranked.candidate, ranked.policy, page);
+  const { body } = shell();
+  const status = element('div', `trust trust--${ranked.policy.decision}`);
+  const statusIcon = element(
+    'span',
+    'trust-icon',
+    ranked.policy.decision === 'allow' ? '✓' : ranked.policy.decision === 'warn' ? '!' : '×',
+  );
+  statusIcon.setAttribute('aria-hidden', 'true');
+  const statusCopy = element('div');
+  statusCopy.append(
+    element('span', 'trust-label', `Trust decision · ${view.statusLabel}`),
+    element('p', '', view.explanation),
+  );
+  status.append(statusIcon, statusCopy);
+
+  const heading = element('div', 'candidate-heading');
+  const valueWrap = element('div');
+  valueWrap.append(element('span', 'field-label', 'Candidate code'));
+  const value = element('strong', 'candidate-value', view.maskedValue);
+  valueWrap.append(value);
+  heading.append(valueWrap);
+  if (ranked.policy.decision !== 'block' && ranked.candidate.value) {
+    const reveal = element('button', 'text-button', 'Reveal');
+    reveal.type = 'button';
+    let revealed = false;
+    reveal.addEventListener('click', () => {
+      revealed = !revealed;
+      value.textContent = revealed ? ranked.candidate.value : view.maskedValue;
+      reveal.textContent = revealed ? 'Mask' : 'Reveal';
+    });
+    heading.append(reveal);
+  }
+
+  const evidence = element('dl', 'evidence');
+  evidence.append(
+    row('Sender', view.sender),
+    row('Subject', view.subject),
+    row('Received', view.age),
+    row('Claimed service', view.claimedService),
+    row('Requesting website', view.activeDomain),
+  );
+  const simulation = view.simulationLabel
+    ? element('p', 'simulation-note', `Fixture · ${view.simulationLabel}`)
+    : null;
+  const extraction = element(
+    'p',
+    'extraction-note',
+    ranked.candidate.extractionMethod === 'gpt-5.6'
+      ? 'GPT-5.6 extracted message facts · deterministic policy decided'
+      : 'Deterministic fallback active · no API key required',
+  );
+  const actions = element('div', 'actions');
+  const dismiss = element('button', 'button button--secondary', 'Dismiss');
+  dismiss.type = 'button';
+  dismiss.addEventListener('click', () => {
+    clearSensitiveState('dismiss');
+    window.close();
+  });
+
+  if (ranked.policy.decision === 'allow') {
+    const fill = element(
+      'button',
+      'button button--primary',
+      `Fill ${page.fieldCount === 1 ? 'code' : `${page.fieldCount} fields`}`,
+    );
+    fill.type = 'button';
+    fill.addEventListener('click', () => void fillSelected(false));
+    actions.append(fill, dismiss);
+  } else if (ranked.policy.decision === 'warn' && ranked.policy.canOverride) {
+    const overrideLabel = element('label', 'override');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    overrideLabel.append(
+      checkbox,
+      document.createTextNode(' I understand the missing or conflicting evidence.'),
+    );
+    const fill = element('button', 'button button--warning', 'Fill with caution');
+    fill.type = 'button';
+    fill.disabled = true;
+    checkbox.addEventListener('change', () => {
+      fill.disabled = !checkbox.checked;
+    });
+    fill.addEventListener('click', () => void fillSelected(true));
+    actions.append(overrideLabel, fill, dismiss);
+  } else {
+    const blocked = element('p', 'blocked-note', 'Fill is unavailable for this security decision.');
+    actions.append(blocked, dismiss);
+  }
+
+  body.append(status, heading, evidence);
+  if (simulation) body.append(simulation);
+  body.append(extraction, actions);
+  scheduleClear(ranked);
+}
+
+async function fillSelected(warningOverride: boolean): Promise<void> {
+  const current = selected;
+  if (!current?.ranked.candidate.value) return;
+  const allowed =
+    current.ranked.policy.decision === 'allow' ||
+    (warningOverride &&
+      current.ranked.policy.decision === 'warn' &&
+      current.ranked.policy.canOverride);
+  if (!allowed) return;
+  try {
+    const tab = await activeTab();
+    const response = await contentMessage(tab.id!, {
+      type: 'FILL_CODE',
+      value: current.ranked.candidate.value,
+      authorized: true,
+    });
+    if (!response.ok || !response.filled)
+      throw new Error(response.ok ? 'Fill was not confirmed.' : response.error);
+    await backgroundMessage({
+      type: 'MARK_CANDIDATE_USED',
+      candidateId: current.ranked.candidate.id,
+    });
+    clearSensitiveState('success');
+    renderMessage(
+      'success',
+      'Code filled',
+      'The verification fields changed. ContextFill did not submit the form.',
+    );
+  } catch (error) {
+    renderMessage(
+      'error',
+      'Could not fill this page',
+      error instanceof Error ? error.message : 'The page changed before filling.',
+    );
+  }
+}
+
+async function scan(): Promise<void> {
+  renderLoading();
+  try {
+    const tab = await activeTab();
+    await chrome.scripting.executeScript({ target: { tabId: tab.id! }, files: ['content.js'] });
+    const response = await contentMessage(tab.id!, { type: 'SCAN_CONTEXT' });
+    if (!response.ok || !response.page)
+      throw new Error(response.ok ? 'Page context was unavailable.' : response.error);
+    const page = pageContextSchema.parse(response.page);
+    const messages = messagesForScenario(page.scenario);
+    const deterministic = extractInboxDeterministic(messages);
+    const enhanced = await enhanceCandidatesWithModel(messages, deterministic);
+    const usedResponse = await backgroundMessage({ type: 'GET_USED_CANDIDATES' });
+    const usedCandidateIds = new Set(usedResponse.ok ? usedResponse.candidateIds : []);
+    const ranked = rankCandidates(enhanced.candidates, page, { usedCandidateIds });
+    const first = ranked[0];
+    if (!first) {
+      renderMessage(
+        'empty',
+        'No usable verification code',
+        'The synthetic inbox contains no recent verification candidate for this fixture.',
+      );
+      return;
+    }
+    const displayCandidate =
+      first.policy.reasonCode === 'expired'
+        ? { ...first, candidate: { ...first.candidate, value: null } }
+        : first;
+    selected = { ranked: displayCandidate, page };
+    renderConfirmation(displayCandidate, page);
+  } catch (error) {
+    renderMessage(
+      'error',
+      'ContextFill cannot inspect this tab',
+      error instanceof Error ? error.message : 'Open a normal webpage and try again.',
+    );
+  }
+}
+
+window.addEventListener('unload', () => clearSensitiveState('dismiss'));
+void scan();

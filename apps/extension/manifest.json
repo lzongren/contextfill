@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "ContextFill",
+  "version": "0.1.0",
+  "description": "Verifies message-to-site context before filling a temporary verification code.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1:4318/*"],
+  "action": {
+    "default_title": "Open ContextFill",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "minimum_chrome_version": "114"
+}

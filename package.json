@@ -22,11 +22,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test",
+    "test:extension": "playwright test --config playwright.extension.config.ts",
     "package": "npm run build:extension && node scripts/package-extension.mjs",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run test:browser"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run test:extension && npm run test:browser"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",
+    "dotenv": "^17.2.2",
     "hono": "^4.9.8",
     "openai": "^6.39.0",
     "tldts": "^7.0.14",

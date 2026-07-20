@@ -58,4 +58,19 @@ describe('fixture-to-page flow', () => {
     expect(applyExplicitFill(selected.policy, target, selected.candidate.value!)).toBe(false);
     expect(document.querySelector('input')?.value).toBe('');
   });
+
+  it('requires an explicit caution override for a warning', () => {
+    document.body.innerHTML = `<form><label>Verification code<input autocomplete="one-time-code" maxlength="6" data-contextfill-visible="true"></label><button>Verify</button></form>`;
+    const target = findVerificationFields(document)!;
+    const selected = rankCandidates(
+      extractInboxDeterministic(messagesForScenario('ambiguous', now)),
+      { ...basePage, scenario: 'ambiguous' },
+      { now },
+    )[0]!;
+    expect(selected.policy.decision).toBe('warn');
+    expect(applyExplicitFill(selected.policy, target, selected.candidate.value!)).toBe(false);
+    expect(document.querySelector('input')?.value).toBe('');
+    expect(applyExplicitFill(selected.policy, target, selected.candidate.value!, true)).toBe(true);
+    expect(document.querySelector('input')?.value).toBe('773804');
+  });
 });
