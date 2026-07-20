@@ -10,7 +10,11 @@ const artifact = resolve(root, 'artifacts', `contextfill-companion-v${packageJso
 
 function run(command, args, options = {}, expectedCode = 0) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    const { input, ...spawnOptions } = options;
+    const child = spawn(command, args, {
+      ...spawnOptions,
+      stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -20,6 +24,7 @@ function run(command, args, options = {}, expectedCode = 0) {
       if (code === expectedCode) resolvePromise({ stdout, stderr });
       else reject(new Error(`${command} exited ${code}\n${stdout}${stderr}`));
     });
+    if (input !== undefined) child.stdin.end(input);
   });
 }
 
@@ -131,22 +136,25 @@ try {
   if (!doctorMissing.stdout.includes('Result: not ready')) {
     throw new Error('Installed companion doctor did not report missing provider setup.');
   }
-  const doctorReady = await run(bin, ['--doctor'], {
+  const clientId = '11111111-2222-4333-8444-555555555555';
+  const setup = await run(bin, ['--setup', 'outlook'], {
     cwd: runtime,
-    env: {
-      ...process.env,
-      CONTEXTFILL_MICROSOFT_CLIENT_ID: '11111111-2222-4333-8444-555555555555',
-    },
+    input: `${clientId}\n`,
   });
-  if (
-    !doctorReady.stdout.includes('Outlook: ready') ||
-    doctorReady.stdout.includes('11111111-2222-4333-8444-555555555555')
-  ) {
+  if (!setup.stdout.includes('Result: ready for outlook') || setup.stdout.includes(clientId)) {
+    throw new Error('Installed companion guided setup did not safely configure Outlook.');
+  }
+  const savedEnvironment = await readFile(resolve(runtime, '.env'), 'utf8');
+  if (!savedEnvironment.includes(`CONTEXTFILL_MICROSOFT_CLIENT_ID=${clientId}`)) {
+    throw new Error('Installed companion guided setup did not persist the Outlook client ID.');
+  }
+  const doctorReady = await run(bin, ['--doctor'], { cwd: runtime });
+  if (!doctorReady.stdout.includes('Outlook: ready') || doctorReady.stdout.includes(clientId)) {
     throw new Error('Installed companion doctor did not safely report provider readiness.');
   }
   await smokeStart(bin, runtime);
   console.log(
-    'Installed companion package passed help/init/doctor/no-overwrite/startup/health smoke checks.',
+    'Installed companion package passed help/init/guided-setup/doctor/no-overwrite/startup/health smoke checks.',
   );
 } finally {
   await rm(directory, { recursive: true, force: true });

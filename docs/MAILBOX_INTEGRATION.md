@@ -33,7 +33,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 3. Install the companion package and create a private runtime configuration:
 
    ```bash
-   npm install --global ./contextfill-companion-v0.2.0-beta.4.tgz
+   npm install --global ./contextfill-companion-v0.2.0-beta.5.tgz
    mkdir contextfill-runtime
    cd contextfill-runtime
    contextfill-service --init
@@ -52,13 +52,20 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 
 ### Configure and connect
 
-1. In the runtime directory, edit the generated `.env` (or copy `.env.example` when running from source) and keep the callback origin:
+1. In the runtime directory, keep the callback origin in the generated `.env` (or copy `.env.example` when running from source):
 
    ```dotenv
    CONTEXTFILL_OAUTH_REDIRECT_ORIGIN=http://localhost:4318
    ```
 
-2. Configure at least one provider below.
+2. Configure at least one provider below. Outlook has a guided path that derives the exact callback and permissions from the runtime configuration, then saves only its public client ID:
+
+   ```bash
+   contextfill-service --setup outlook
+   ```
+
+   From a source checkout, use `npm run service -- --setup outlook`. Gmail's web-client secret must still be entered directly in the private `.env` file.
+
 3. Validate the local configuration. The doctor prints exact callbacks and scopes, checks that the loopback ports agree and `.env` is owner-only, and never prints credential values:
 
    ```bash
@@ -122,7 +129,13 @@ Official references: [Gmail scopes](https://developers.google.com/workspace/gmai
    ```
 
 4. Add delegated `Mail.Read` and `User.Read` permissions. Do not add application permissions or `Mail.ReadWrite`.
-5. Enable public-client flows for the application and set:
+5. Enable public-client flows for the application. The recommended guided command saves the public client ID and defaults the tenant to `common`:
+
+   ```bash
+   contextfill-service --setup outlook
+   ```
+
+   Use `--tenant <tenant-id-or-domain>` to restrict sign-in. The equivalent manual settings are:
 
    ```dotenv
    CONTEXTFILL_MICROSOFT_CLIENT_ID=

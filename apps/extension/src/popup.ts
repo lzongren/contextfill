@@ -38,6 +38,8 @@ import type {
 } from './shared/messages.js';
 
 const app = document.querySelector<HTMLElement>('#app')!;
+const mailboxSetupGuide =
+  'https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md';
 let selected: { ranked: RankedCandidate; page: PageContext } | null = null;
 let clearTimer: ReturnType<typeof setTimeout> | null = null;
 let mailSource: MailSource = 'synthetic';
@@ -336,7 +338,9 @@ function appendProviderCards(body: HTMLElement, statuses: MailProviderStatus[]):
         }`
       : status.configured
         ? `Connect ${label} with read-only mail access. ContextFill fetches only recent verification-like messages.`
-        : `Add the ${label} OAuth client settings to .env, then restart the companion service.`;
+        : status.provider === 'outlook'
+          ? 'Run contextfill-service --setup outlook in the companion directory, then restart the service.'
+          : 'Create a Gmail OAuth web client, add its settings to the private .env file, then restart the service.';
     const providerCard = sourceCard(label, state, copy);
     if (status.connected) {
       const use = sourceAction(
@@ -368,10 +372,18 @@ function appendProviderCards(body: HTMLElement, statuses: MailProviderStatus[]):
       });
       providerCard.actions.append(use, disconnect);
     } else {
-      const connect = sourceAction(`Connect ${label}`, true);
-      connect.disabled = !status.configured;
-      connect.addEventListener('click', () => void connectProvider(status.provider));
-      providerCard.actions.append(connect);
+      if (status.configured) {
+        const connect = sourceAction(`Connect ${label}`, true);
+        connect.addEventListener('click', () => void connectProvider(status.provider));
+        providerCard.actions.append(connect);
+      } else {
+        const setup = sourceAction(`Open ${label} setup guide`, true);
+        setup.addEventListener('click', () => {
+          const section = status.provider === 'gmail' ? '#gmail' : '#outlook-and-microsoft-365';
+          void chrome.tabs.create({ url: `${mailboxSetupGuide}${section}` });
+        });
+        providerCard.actions.append(setup);
+      }
     }
     body.append(providerCard.card);
   }

@@ -53,3 +53,7 @@ OAuth app registration is a deployment choice owned by the user's Google Cloud p
 ## D-013: Live OAuth setup has a non-secret readiness gate
 
 Provider registration errors should be detected before the user reaches a consent screen. The packaged companion therefore includes `--doctor`, which derives configuration from the same code used by the runtime, prints exact callback URIs and requested scopes, validates the service/callback port match, checks owner-only `.env` permissions on POSIX systems, and reports missing variable names without ever echoing client IDs or secrets. A nonzero exit means no provider is safely ready.
+
+## D-014: Outlook registration gets a guided local setup path
+
+Microsoft public-client registrations do not use a client secret, so the companion may safely guide the registration and accept the public Application (client) ID. `--setup outlook` derives its callback and delegated permissions from runtime configuration, validates the UUID and tenant, updates only the Microsoft keys, removes duplicate assignments, preserves unrelated settings, locks `.env` to owner-only permissions, and runs the doctor without echoing the ID. Gmail remains a manual private-file flow until its client secret can be collected without terminal echo or command-history exposure.
