@@ -49,3 +49,7 @@ Real-mail use must not require a source checkout or TypeScript toolchain. Releas
 ## D-012: Exported `.eml` is the provider-independent real-message bridge
 
 OAuth app registration is a deployment choice owned by the user's Google Cloud project or Microsoft tenant. ContextFill therefore also accepts one explicitly chosen RFC 5322 `.eml` file in the popup. A maintained, browser-compatible MIME parser handles common multipart and encoded messages under a 2 MB input cap and explicit nesting/header limits. Only normalized sender, subject, date, body text, and HTTP(S) link evidence enter the existing schema; attachments never enter extraction. The raw file and normalized body are dropped immediately after local deterministic candidate extraction, never enter optional model extraction, and are never written to extension storage.
+
+## D-013: Live OAuth setup has a non-secret readiness gate
+
+Provider registration errors should be detected before the user reaches a consent screen. The packaged companion therefore includes `--doctor`, which derives configuration from the same code used by the runtime, prints exact callback URIs and requested scopes, validates the service/callback port match, checks owner-only `.env` permissions on POSIX systems, and reports missing variable names without ever echoing client IDs or secrets. A nonzero exit means no provider is safely ready.

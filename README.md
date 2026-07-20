@@ -141,6 +141,7 @@ The current OpenAI model guide identifies `gpt-5.6` as the alias for GPT-5.6 Sol
 ```bash
 npm run demo            # Start judge pages at 127.0.0.1:4173
 npm run service         # Start optional loopback extractor
+npm run service -- --doctor # Validate mailbox OAuth readiness without printing secrets
 npm run dev             # Start both processes
 npm test                # Unit and integration tests
 npm run check           # Fast iteration gate: format, lint, types, unit/integration tests
@@ -157,7 +158,7 @@ The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 
 Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
 
-Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.3`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.4`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
 Download verified extension packages and their checksums from [GitHub Releases](https://github.com/lzongren/contextfill/releases).
 

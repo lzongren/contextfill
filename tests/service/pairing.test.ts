@@ -30,6 +30,23 @@ function mailbox(): MailboxManagerLike {
 }
 
 describe('per-install companion pairing', () => {
+  it('does not access the keychain when explicit legacy pairing is configured', async () => {
+    const store = new FakeCredentialStore();
+    const loadPairing = vi.spyOn(store, 'loadPairing');
+    const manager = new PairingManager(
+      { CONTEXTFILL_EXTENSION_ID: origin.replace('chrome-extension://', '') },
+      store,
+    );
+
+    expect(await manager.bootstrapCode()).toBeNull();
+    expect(loadPairing).not.toHaveBeenCalled();
+    expect(await manager.status(origin, undefined)).toEqual({
+      mode: 'legacy-env',
+      authenticated: true,
+      persistent: false,
+    });
+  });
+
   it('uses a one-time code and restores only the hashed capability from the keychain', async () => {
     const store = new FakeCredentialStore();
     const manager = new PairingManager(

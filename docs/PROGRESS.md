@@ -25,5 +25,8 @@
 - [x] Added an installable `contextfill-service` companion package with safe `--init`; tagged releases publish it beside the extension with a separate checksum.
 - [x] Added a provider-independent one-time `.eml` import that parses a bounded exported Gmail/Outlook message locally, ignores attachments during extraction, persists no message data, and reuses the same deterministic trust/explicit-fill path.
 - [x] Passed the `v0.2.0-beta.3` release gate with 43 unit/integration tests, the packaged-extension load/pairing check, 5 installed-Chrome scenarios, companion clean-install smoke test, archive integrity checks, and a zero-vulnerability production audit.
+- [x] Added a non-secret mailbox OAuth doctor for exact callback/scope reporting, loopback validation, provider readiness, and private-config permission checks.
+- [x] Corrected the installed-companion smoke test so it actually starts the packaged binary and probes `/health`, in addition to help/init/doctor/no-overwrite checks.
+- [x] Passed the `v0.2.0-beta.4` local release gate with 46 unit/integration tests, packaged-extension and installed-Chrome checks, companion runtime smoke, artifact integrity, and a zero-vulnerability production audit.
 - [ ] Complete live OAuth connections with user-owned Gmail and Outlook app registrations.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.
