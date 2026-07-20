@@ -1,6 +1,15 @@
 # Real mailbox integration
 
-ContextFill can read recent verification-like messages from Gmail or Outlook through the local companion service. Mailbox OAuth tokens and provider API calls stay in the Node.js process on `127.0.0.1`; the extension receives only a normalized, bounded set of recent message evidence. The provider never decides whether a code may be filled.
+ContextFill has two real-message paths. A one-time `.eml` import needs no account connection and stays entirely in the extension popup. Ongoing Gmail or Outlook access uses the local companion service: OAuth tokens and provider API calls stay in the Node.js process on `127.0.0.1`, while the extension receives only a normalized, bounded set of recent message evidence. Neither the provider nor the MIME parser decides whether a code may be filled.
+
+## Try one real message without OAuth
+
+1. In Gmail or Outlook, export or download the verification message in original `.eml` format.
+2. Open the page that is requesting the code.
+3. Open ContextFill, click the message-source pill, and choose **Import email file**.
+4. Select the `.eml` file, review the sender, subject, requesting website, and allow/warn/block explanation, then explicitly choose **Fill** if appropriate.
+
+The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside the open popup. ContextFill extracts only normalized sender, subject, date, readable body text, and HTTP(S) links; it does not render the email HTML or use attachments as evidence. The raw file and normalized body are dropped immediately after local deterministic candidate extraction, and neither they nor the code are written to extension storage. Imported messages are never sent through optional model extraction, even when the real-mail model toggle was previously enabled. Encrypted, malformed, or metadata-incomplete messages fail closed with an explanation.
 
 ## Current security boundary
 
@@ -10,6 +19,7 @@ ContextFill can read recent verification-like messages from Gmail or Outlook thr
 - Refresh tokens and the hashed service capability are stored in the native macOS Keychain, Windows Credential Manager, or Linux Secret Service through `@napi-rs/keyring`. Access tokens stay in service memory. If the keyring is unavailable, the UI explicitly reports session-only storage.
 - The extension stores only its random pairing capability, selected source, and explicit model opt-in. Chrome storage is restricted to trusted extension contexts; message bodies, codes, provider tokens, and account authorization never enter it.
 - Real mailbox messages use deterministic local extraction by default. Sending a prefiltered real message through the optional GPT-5.6 extractor requires a separate explicit toggle in the source screen.
+- Imported `.eml` files are capped at 2 MB and parsed with explicit MIME nesting and header-size limits. HTML is converted to inert text plus HTTP(S) link evidence; scripts, styles, templates, and attachments do not enter extraction.
 - Gmail queries only verification-like messages from the last day and fetches at most 12 bodies. Outlook reads 25 recent summaries, filters locally, then retrieves at most 12 verification-like bodies before returning at most 10 messages.
 - Disconnect clears memory, deletes the keychain refresh credential, and makes a best-effort Google revocation request.
 - ContextFill still shows an allow/warn/block decision and requires explicit user approval. It never submits the form.
@@ -23,7 +33,7 @@ ContextFill can read recent verification-like messages from Gmail or Outlook thr
 3. Install the companion package and create a private runtime configuration:
 
    ```bash
-   npm install --global ./contextfill-companion-v0.2.0-beta.2.tgz
+   npm install --global ./contextfill-companion-v0.2.0-beta.3.tgz
    mkdir contextfill-runtime
    cd contextfill-runtime
    contextfill-service --init
@@ -120,5 +130,5 @@ Official references: [authorization code flow with PKCE](https://learn.microsoft
 - If the service is stopped, the extension explains that the mailbox source is unavailable; it does not silently switch to another real account.
 - If access expires or is revoked, the service requires a new provider connection. Disconnect deletes the keychain credential and reports an error instead of claiming success if durable deletion fails.
 - If the extension loses its pairing capability, restart once with `CONTEXTFILL_PAIRING_RESET=1` and pair again.
-- If provider output is malformed, message normalization rejects it before extraction.
+- If provider output or an imported message is malformed, message normalization rejects it before extraction.
 - The synthetic demo inbox remains available as an explicit source for development and regression testing.

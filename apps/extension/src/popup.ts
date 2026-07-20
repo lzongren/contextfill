@@ -6,7 +6,9 @@ import {
   rankCandidates,
   type PageContext,
   type RankedCandidate,
+  type MailboxMessage,
 } from '../../../packages/core/src/index.js';
+import { EmlImportError, parseEmlImport } from './eml-import.js';
 import { enhanceCandidatesWithModel } from './model-client.js';
 import {
   beginMailConnection,
@@ -20,11 +22,13 @@ import {
   pairCompanionService,
   saveMailSource,
   saveRealMailModelOptIn,
+  shouldUseModelForSource,
   sourceLabel,
   type MailProviderStatus,
   type PairingStatus,
   type MailProvider,
   type MailSource,
+  type PersistentMailSource,
 } from './mail-client.js';
 import type {
   BackgroundRequest,
@@ -37,6 +41,8 @@ const app = document.querySelector<HTMLElement>('#app')!;
 let selected: { ranked: RankedCandidate; page: PageContext } | null = null;
 let clearTimer: ReturnType<typeof setTimeout> | null = null;
 let mailSource: MailSource = 'synthetic';
+let persistedMailSource: PersistentMailSource = 'synthetic';
+let importedMessages: MailboxMessage[] = [];
 let realMailModelOptIn = false;
 
 function element<K extends keyof HTMLElementTagNameMap>(
@@ -118,6 +124,8 @@ function clearSensitiveState(reason: 'timeout' | 'dismiss' | 'success'): void {
   if (clearTimer) clearTimeout(clearTimer);
   clearTimer = null;
   selected = null;
+  importedMessages = [];
+  if (mailSource === 'import') mailSource = persistedMailSource;
   if (reason === 'timeout') {
     renderMessage(
       'timeout',
@@ -370,15 +378,36 @@ function appendProviderCards(body: HTMLElement, statuses: MailProviderStatus[]):
 }
 
 async function chooseSource(source: MailSource): Promise<void> {
+  if (source === 'import') return;
   mailSource = source;
+  persistedMailSource = source;
+  importedMessages = [];
   await saveMailSource(source);
   await scan();
+}
+
+async function importEml(file: File): Promise<void> {
+  try {
+    const message = await parseEmlImport(file);
+    importedMessages = [message];
+    mailSource = 'import';
+    await scan();
+  } catch (error) {
+    importedMessages = [];
+    mailSource = persistedMailSource;
+    renderMessage(
+      'error',
+      'Could not import this email',
+      error instanceof EmlImportError ? error.message : 'Choose a valid exported .eml message.',
+    );
+  }
 }
 
 async function connectProvider(provider: MailProvider): Promise<void> {
   try {
     await saveMailSource(provider);
     mailSource = provider;
+    persistedMailSource = provider;
     const authorizationUrl = await beginMailConnection(provider);
     await chrome.tabs.create({ url: authorizationUrl });
     renderMessage(
@@ -406,7 +435,7 @@ async function renderMailSources(): Promise<void> {
     element(
       'p',
       'muted',
-      'Mailbox access stays in the loopback companion service. ContextFill requests read-only mail access and still requires explicit fill approval.',
+      'Import one exported message entirely in this popup, or connect read-only mailbox access through the loopback companion. Every source still requires explicit fill approval.',
     ),
   );
 
@@ -420,6 +449,24 @@ async function renderMailSources(): Promise<void> {
   useDemo.addEventListener('click', () => void chooseSource('synthetic'));
   demo.actions.append(useDemo);
   body.append(demo.card);
+
+  const imported = sourceCard(
+    'Import email file',
+    'No account needed',
+    'Export one Gmail or Outlook message as .eml. It is parsed locally, used once, and never saved; attachments are ignored.',
+  );
+  const fileLabel = element('label', 'button button--secondary file-button', 'Choose .eml file');
+  const fileInput = element('input', 'file-input');
+  fileInput.type = 'file';
+  fileInput.accept = '.eml,message/rfc822';
+  fileInput.setAttribute('aria-label', 'Choose exported email file');
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) void importEml(file);
+  });
+  fileLabel.append(fileInput);
+  imported.actions.append(fileLabel);
+  body.append(imported.card);
 
   try {
     const pairing = await getPairingStatus();
@@ -451,8 +498,8 @@ async function renderMailSources(): Promise<void> {
     'GPT-5.6 for real mail',
     realMailModelOptIn ? 'Enabled' : 'Local-only',
     realMailModelOptIn
-      ? 'One prefiltered message at a time may be sent through your configured OpenAI API for fact extraction. Deterministic policy still decides.'
-      : 'Real Gmail and Outlook messages use deterministic extraction and stay local. The synthetic demo can still exercise GPT-5.6.',
+      ? 'One prefiltered Gmail or Outlook message at a time may be sent through your configured OpenAI API for fact extraction. Imported files always stay local. Deterministic policy still decides.'
+      : 'Real Gmail, Outlook, and imported messages use deterministic extraction and stay local. The synthetic demo can still exercise GPT-5.6.',
   );
   const toggleModel = sourceAction(
     realMailModelOptIn ? 'Disable for real mail' : 'Enable for real mail',
@@ -521,12 +568,14 @@ async function scan(): Promise<void> {
     const messages =
       mailSource === 'synthetic'
         ? messagesForScenario(page.scenario)
-        : await fetchMailboxMessages(mailSource);
+        : mailSource === 'import'
+          ? importedMessages
+          : await fetchMailboxMessages(mailSource);
     const deterministic = extractInboxDeterministic(messages);
-    const enhanced =
-      mailSource === 'synthetic' || realMailModelOptIn
-        ? await enhanceCandidatesWithModel(messages, deterministic)
-        : { candidates: deterministic, modelUsed: false, fallbackReason: null };
+    if (mailSource === 'import') importedMessages = [];
+    const enhanced = shouldUseModelForSource(mailSource, realMailModelOptIn)
+      ? await enhanceCandidatesWithModel(messages, deterministic)
+      : { candidates: deterministic, modelUsed: false, fallbackReason: null };
     const usedResponse = await backgroundMessage({ type: 'GET_USED_CANDIDATES' });
     const usedCandidateIds = new Set(usedResponse.ok ? usedResponse.candidateIds : []);
     const ranked = rankCandidates(enhanced.candidates, page, { usedCandidateIds });
@@ -562,5 +611,6 @@ void (async () => {
     loadMailSource(),
     loadRealMailModelOptIn(),
   ]);
+  persistedMailSource = mailSource;
   await scan();
 })();

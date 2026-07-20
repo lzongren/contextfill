@@ -23,5 +23,7 @@
 - [x] Verified packaged-extension pairing against a real temporary loopback service, including privileged extension fetches that omit `Origin`.
 - [x] Verified a disposable native macOS Keychain write/read/delete and prepared `v0.2.0-beta.2` with 39 unit/integration tests.
 - [x] Added an installable `contextfill-service` companion package with safe `--init`; tagged releases publish it beside the extension with a separate checksum.
+- [x] Added a provider-independent one-time `.eml` import that parses a bounded exported Gmail/Outlook message locally, ignores attachments during extraction, persists no message data, and reuses the same deterministic trust/explicit-fill path.
+- [x] Passed the `v0.2.0-beta.3` release gate with 43 unit/integration tests, the packaged-extension load/pairing check, 5 installed-Chrome scenarios, companion clean-install smoke test, archive integrity checks, and a zero-vulnerability production audit.
 - [ ] Complete live OAuth connections with user-owned Gmail and Outlook app registrations.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.
