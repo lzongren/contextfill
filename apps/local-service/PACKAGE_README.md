@@ -13,13 +13,20 @@ cd contextfill-runtime
 contextfill-service --init
 ```
 
-For Outlook, run the guided setup after creating a Microsoft Entra app registration. It prints the exact callback and delegated permissions, asks only for the public Application (client) ID, preserves unrelated settings, and keeps `.env` owner-only:
+For Outlook, run the guided setup before creating a Microsoft Entra app registration. It prints the account prerequisite, exact callback, and delegated permissions, then asks only for the public Application (client) ID, preserves unrelated settings, and keeps `.env` owner-only. Creating an app registration requires a work/school account with an Entra tenant role or a personal account backed by its own Azure tenant; a standalone Outlook.com account cannot create one.
 
 ```bash
 contextfill-service --setup outlook
 ```
 
-Gmail's OAuth web client includes a secret, so configure its values directly in the private `.env` file. Provider registration is documented at <https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md>. Before starting OAuth, validate the exact callbacks, scopes, loopback port, and private file permissions without exposing credential values:
+For Gmail, print the registration instructions, then import Google's downloaded OAuth web-client JSON. The import validates the exact callback and writes the ID and secret without echoing either value:
+
+```bash
+contextfill-service --setup gmail
+contextfill-service --setup gmail --credentials /path/to/client_secret.json
+```
+
+Provider registration is documented at <https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md>. Before starting OAuth, validate the exact callbacks, scopes, loopback port, and private file permissions without exposing credential values:
 
 ```bash
 contextfill-service --doctor

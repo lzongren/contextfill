@@ -90,6 +90,7 @@ test('the packaged MV3 extension loads and boots its popup bundle', async () => 
     await expect(
       popup.locator('.source-card').getByText('Outlook', { exact: true }).first(),
     ).toBeVisible();
+    await expect(popup.getByText(/standalone personal Outlook\.com account/)).toBeVisible();
     await expect(popup.getByRole('button', { name: 'Open Gmail setup guide' })).toBeVisible();
     await expect(popup.getByRole('button', { name: 'Open Outlook setup guide' })).toBeVisible();
   } finally {

@@ -30,5 +30,8 @@
 - [x] Passed the `v0.2.0-beta.4` local release gate with 46 unit/integration tests, packaged-extension and installed-Chrome checks, companion runtime smoke, artifact integrity, and a zero-vulnerability production audit.
 - [x] Added a guided Outlook setup command and extension setup links so first-time users get runtime-derived registration instructions and owner-only configuration instead of a disabled Connect button.
 - [x] Passed the `v0.2.0-beta.5` local release gate with 49 unit/integration tests, packaged-extension and five installed-Chrome checks, guided companion clean-install smoke, artifact integrity, and a zero-vulnerability production audit.
+- [x] Reproduced the personal-Outlook `AADSTS50020` path and corrected the CLI, extension, and integration guide to distinguish Entra registration ownership from personal-account sign-in support.
+- [x] Added a secret-safe Gmail setup path that validates Google's downloaded OAuth web-client JSON and exact callback before privately importing credentials.
+- [x] Passed the `v0.2.0-beta.6` local release gate with 52 unit/integration tests, packaged-extension and five installed-Chrome checks, Gmail/Outlook companion clean-install smoke, artifact integrity, and a zero-vulnerability production audit.
 - [ ] Complete live OAuth connections with user-owned Gmail and Outlook app registrations.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.

@@ -42,7 +42,7 @@ Then:
 
 No email account, cloud setup, personal data, paid service, or OpenAI API key is required. See [Judge testing](docs/JUDGE_TESTING.md) for every fixture and expected result.
 
-For a real-message test without cloud setup, export one message from Gmail or Outlook as `.eml`, open **Message source → Import email file**, and choose it. The bounded file is parsed locally inside the popup, used once, and never persisted. For ongoing use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Outlook has a guided `contextfill-service --setup outlook` path that prints the exact callback and permissions, then privately saves the public client ID; Gmail retains a manual secret setup because its web client has a client secret. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for both paths, least-privilege OAuth setup, current security boundaries, and provider limitations.
+For a real-message test without cloud setup, export one message from Gmail or Outlook as `.eml`, open **Message source → Import email file**, and choose it. The bounded file is parsed locally inside the popup, used once, and never persisted. For ongoing use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Outlook has a guided `contextfill-service --setup outlook` path that prints the exact callback and permissions, then privately saves the public client ID. Creating that registration requires a work/school account with an Entra tenant role or a personal account backed by its own Azure tenant; a standalone Outlook.com account can use the finished multitenant connector but cannot own its registration. Gmail's guided `contextfill-service --setup gmail` path prints its exact callback and imports Google's downloaded web-client JSON directly into owner-only configuration without printing the secret. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for both paths, least-privilege OAuth setup, current security boundaries, and provider limitations.
 
 ## Architecture
 
@@ -141,6 +141,7 @@ The current OpenAI model guide identifies `gpt-5.6` as the alias for GPT-5.6 Sol
 ```bash
 npm run demo            # Start judge pages at 127.0.0.1:4173
 npm run service         # Start optional loopback extractor
+npm run service -- --setup gmail # Guide Gmail setup and import its web-client JSON
 npm run service -- --setup outlook # Guide Outlook registration and save its client ID
 npm run service -- --doctor # Validate mailbox OAuth readiness without printing secrets
 npm run dev             # Start both processes
@@ -159,7 +160,7 @@ The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 
 Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
 
-Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.5`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.6`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
 Download verified extension packages and their checksums from [GitHub Releases](https://github.com/lzongren/contextfill/releases).
 

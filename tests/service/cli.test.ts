@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  configureGmailFromCredentials,
   configureOutlook,
   environmentTemplate,
+  gmailSetupInstructions,
   initializeConfig,
   inspectCompanionReadiness,
   outlookSetupInstructions,
@@ -76,7 +78,82 @@ describe('installable companion CLI', () => {
     expect(guide).toContain('http://localhost:4318/mail/oauth/outlook/callback');
     expect(guide).toContain('Mail.Read');
     expect(guide).toContain('User.Read');
+    expect(guide).toContain('personal Outlook.com account can use the finished connector');
+    expect(guide).toContain('Application Developer role');
     expect(guide).toContain('never asks for a Microsoft client secret');
+  });
+
+  it('guides Gmail web-client creation using runtime-derived settings', () => {
+    const guide = gmailSetupInstructions({
+      CONTEXTFILL_SERVICE_PORT: '4318',
+      CONTEXTFILL_OAUTH_REDIRECT_ORIGIN: 'http://localhost:4318',
+    });
+
+    expect(guide).toContain('https://www.googleapis.com/auth/gmail.readonly');
+    expect(guide).toContain('http://localhost:4318/mail/oauth/gmail/callback');
+    expect(guide).toContain('--setup gmail --credentials');
+    expect(guide).toContain('never prints either credential');
+  });
+
+  it('privately imports a matching Google web client without printing credentials', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'contextfill-setup-gmail-'));
+    temporaryDirectories.push(directory);
+    const credentials = join(directory, 'client-secret.json');
+    const clientId = '123456789-contextfill.apps.googleusercontent.com';
+    const clientSecret = 'fake-google-client-secret';
+    await writeFile(
+      credentials,
+      JSON.stringify({
+        web: {
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uris: ['http://localhost:4318/mail/oauth/gmail/callback'],
+        },
+      }),
+      { mode: 0o600 },
+    );
+
+    const result = await configureGmailFromCredentials(directory, credentials, {
+      CONTEXTFILL_SERVICE_PORT: '4318',
+      CONTEXTFILL_OAUTH_REDIRECT_ORIGIN: 'http://localhost:4318',
+    });
+    const saved = await readFile(result.output, 'utf8');
+
+    expect(result.report.ok).toBe(true);
+    expect(result.report.text).toContain('Gmail: ready');
+    expect(result.report.text).not.toContain(clientId);
+    expect(result.report.text).not.toContain(clientSecret);
+    expect(saved).toContain(`CONTEXTFILL_GOOGLE_CLIENT_ID=${clientId}`);
+    expect(saved).toContain(`CONTEXTFILL_GOOGLE_CLIENT_SECRET=${clientSecret}`);
+    if (process.platform !== 'win32') {
+      expect((await stat(result.output)).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it('rejects a Google web client whose registered callback does not match runtime', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'contextfill-setup-gmail-invalid-'));
+    temporaryDirectories.push(directory);
+    const credentials = join(directory, 'client-secret.json');
+    await writeFile(
+      credentials,
+      JSON.stringify({
+        web: {
+          client_id: '123456789-contextfill.apps.googleusercontent.com',
+          client_secret: 'fake-google-client-secret',
+          redirect_uris: ['http://localhost:9999/wrong'],
+        },
+      }),
+    );
+
+    await expect(
+      configureGmailFromCredentials(directory, credentials, {
+        CONTEXTFILL_SERVICE_PORT: '4318',
+        CONTEXTFILL_OAUTH_REDIRECT_ORIGIN: 'http://localhost:4318',
+      }),
+    ).rejects.toThrow('missing the exact redirect URI');
+    await expect(readFile(join(directory, '.env'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('saves Outlook public-client settings privately without replacing other configuration', async () => {

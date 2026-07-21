@@ -339,8 +339,8 @@ function appendProviderCards(body: HTMLElement, statuses: MailProviderStatus[]):
       : status.configured
         ? `Connect ${label} with read-only mail access. ContextFill fetches only recent verification-like messages.`
         : status.provider === 'outlook'
-          ? 'Run contextfill-service --setup outlook in the companion directory, then restart the service.'
-          : 'Create a Gmail OAuth web client, add its settings to the private .env file, then restart the service.';
+          ? 'Requires an app registration owned by an Entra tenant. A standalone personal Outlook.com account can use the finished connector but cannot create the registration.'
+          : 'Run contextfill-service --setup gmail for an exact callback, then import Google’s downloaded web-client JSON without copying its secret.';
     const providerCard = sourceCard(label, state, copy);
     if (status.connected) {
       const use = sourceAction(
