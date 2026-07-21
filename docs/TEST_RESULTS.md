@@ -25,8 +25,8 @@ The automated release gate uses injected provider/model responses and does not m
 ## Packaged extension
 
 - Path: `artifacts/contextfill-extension-v0.2.0-beta.7.zip`
-- Size: 153,160 bytes
-- SHA-256: `e631867f03ef9865234a3580ae1ddfb0d9d78b71405e244bef9b8491cec6d1c6`
+- Size: 153,179 bytes
+- SHA-256: `9311ccf0f8e1700a483c6a3d8fc951fc66dae16634bd475b5a46498736b6a3d1`
 - ZIP contents: root-level `manifest.json`, popup HTML/CSS/JS, content script, and background worker
 
 ## Packaged companion service
