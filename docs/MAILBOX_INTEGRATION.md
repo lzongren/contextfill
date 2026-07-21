@@ -105,9 +105,9 @@ Keychain failure does not break the connector, but both pairing and provider aut
 1. Open `https://www.easyjet.com/en?accntmdl=2` and select **Find Booking** so the visible surname and booking-reference fields are present.
 2. Open ContextFill, grant access only to `https://www.easyjet.com/*` if Chrome requests it, and select the connected Gmail source.
 3. Choose one masked confirmation. ContextFill refuses to choose automatically when several bookings exist.
-4. Review the in-page deterministic trust trace and field map, then choose **Transfer 2 verified facts**.
-5. Confirm the receipt says the form was not submitted. Do not press easyJet's **Find Booking** action during conformance testing.
-6. Choose **Undo** and confirm both fields return to their original values. Undo intentionally does not make the capsule reusable.
+4. If the message explicitly states the passenger surname, review the two-fact Capsule, transfer both facts, confirm the no-submit receipt, and use **Undo** to restore both fields if testing.
+5. If the message contains only a greeting name and booking reference, choose the clearly labeled reference-only transfer and type the surname manually on easyJet; ContextFill will not guess it.
+6. ContextFill never checks the consent box or presses **Find Booking**. Do not submit during conformance testing.
 
 Apple Hide My Email forwarding is supported only when the envelope sender is an `icloud.com` relay whose local part encodes the same domain as the apparent original easyJet address. A display name alone is never sender evidence. Raw relay addresses, booking references, surnames, and message bodies are not logged or persisted.
 

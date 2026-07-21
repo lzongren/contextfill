@@ -8,6 +8,7 @@ export * from './fixtures/messages.js';
 export * from './orchestration/apply.js';
 export * from './policy/evaluate.js';
 export * from './policy/capsule.js';
+export * from './policy/sender.js';
 export * from './presentation/confirmation.js';
 export * from './presentation/capsule-overlay.js';
 export * from './ranking/rank.js';
