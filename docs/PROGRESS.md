@@ -49,6 +49,6 @@
 - [x] Added privacy-preserving local activity history with a strict secret-free schema, 24-record cap, seven-day TTL, clear control, and trusted-site management page.
 - [x] Passed the pre-release Auto-Continue gate: formatting/lint/types, 105 unit/integration tests, three production builds, eight packaged-extension scenarios, and seven judge-browser regressions.
 - [x] Completed fresh real Gmail acceptance in Auto mode: Medium opened a verified magic-login link in the same tab and Substack filled a split OTP after the visible cancellable countdown, without reopening the extension after each exact-site opt-in or exposing a code/token.
-- [ ] Package, publish, and independently download/verify the `v0.2.0-beta.8` public prerelease after the final real-flow acceptance.
+- [x] Published `v0.2.0-beta.8` as a public GitHub prerelease from the merged Auto-Continue commit; independently downloaded all four assets and verified both checksums, archive structures, and embedded versions.
 - [ ] Complete a live Outlook connection when an Entra app registration is available; this is not required for the Gmail-backed release.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.
