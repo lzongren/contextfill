@@ -9,6 +9,8 @@ import {
 
 export const mailProviderSchema = z.enum(['gmail', 'outlook']);
 export type MailProvider = z.infer<typeof mailProviderSchema>;
+export const mailboxPurposeSchema = z.enum(['temporary_action', 'easyjet_booking_lookup']);
+export type MailboxPurpose = z.infer<typeof mailboxPurposeSchema>;
 
 export type MailProviderStatus = {
   provider: MailProvider;
@@ -24,7 +26,7 @@ export type MailboxManagerLike = {
   beginConnection(provider: MailProvider): Promise<string>;
   completeConnection(provider: MailProvider, code: string, state: string): Promise<string>;
   disconnect(provider: MailProvider): Promise<void>;
-  listMessages(provider: MailProvider): Promise<MailboxMessage[]>;
+  listMessages(provider: MailProvider, purpose?: MailboxPurpose): Promise<MailboxMessage[]>;
 };
 
 type OAuthConfig = {
@@ -236,15 +238,42 @@ function compact(value: string | null | undefined, max: number): string | null {
 function parseSender(value: string | null | undefined): {
   name: string | null;
   address: string | null;
+  relay: MailboxMessage['senderRelay'];
 } {
   const input = value?.trim() ?? '';
   const bracketed = input.match(/<([^<>\s]+@[^<>\s]+)>/);
   const plain = input.match(/[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const address = compact(bracketed?.[1] ?? plain?.[0], 320)?.toLowerCase() ?? null;
   const name = bracketed
-    ? compact(input.slice(0, bracketed.index).replace(/^['"]|['"]$/g, ''), 320)
+    ? compact(
+        input
+          .slice(0, bracketed.index)
+          .trim()
+          .replace(/^['"]|['"]$/g, ''),
+        320,
+      )
     : null;
-  return { name, address };
+  const apparent = name?.match(/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i)?.[0];
+  const relayAt = address?.lastIndexOf('@') ?? -1;
+  const apparentAt = apparent?.lastIndexOf('@') ?? -1;
+  const encodedDomain =
+    apparentAt > 0
+      ? apparent!
+          .slice(apparentAt + 1)
+          .toLowerCase()
+          .replace(/\./g, '_')
+      : '';
+  const relayLocal = relayAt > 0 ? address!.slice(0, relayAt).toLowerCase() : '';
+  const relayDomain = relayAt > 0 ? address!.slice(relayAt + 1).toLowerCase() : '';
+  const relay =
+    apparent &&
+    relayDomain === 'icloud.com' &&
+    new RegExp(`(?:^|_)at_${encodedDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_|$)`).test(
+      relayLocal,
+    )
+      ? ({ kind: 'apple_hide_my_email', originalAddress: apparent.toLowerCase() } as const)
+      : null;
+  return { name, address, relay };
 }
 
 function decodeBase64Url(value: string | undefined): string {
@@ -333,6 +362,36 @@ function looksTemporaryActionLike(message: MailboxMessage): boolean {
   return looksTemporaryActionText(`${message.subject}\n${message.body}`);
 }
 
+function effectiveSenderAddress(message: MailboxMessage): string | null {
+  if (!message.senderRelay) return message.senderAddress;
+  if (!message.senderAddress?.toLowerCase().endsWith('@icloud.com')) return null;
+  const original = message.senderRelay.originalAddress.toLowerCase();
+  const originalAt = original.lastIndexOf('@');
+  const relayAt = message.senderAddress.lastIndexOf('@');
+  if (originalAt <= 0 || relayAt <= 0) return null;
+  const encodedDomain = original.slice(originalAt + 1).replace(/\./g, '_');
+  const relayLocal = message.senderAddress.slice(0, relayAt).toLowerCase();
+  return new RegExp(
+    `(?:^|_)at_${encodedDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:_|$)`,
+  ).test(relayLocal)
+    ? original
+    : null;
+}
+
+function isVerifiedEasyJetBookingMessage(message: MailboxMessage): boolean {
+  const sender = effectiveSenderAddress(message);
+  const senderDomain = sender?.slice(sender.lastIndexOf('@') + 1).toLowerCase();
+  const text = `${message.subject}\n${message.body}`;
+  return (
+    senderDomain === 'easyjet.com' &&
+    /\beasyJet\b.*\bbooking reference\b|\bbooking reference\b.*\beasyJet\b/i.test(
+      message.subject,
+    ) &&
+    /\bbooking\b/i.test(message.body) &&
+    /\b(?:www\.)?easyjet\.com\b/i.test(text)
+  );
+}
+
 export function normalizeGmailMessage(input: unknown): MailboxMessage | null {
   const parsed = gmailMessageSchema.safeParse(input);
   if (!parsed.success) return null;
@@ -350,6 +409,7 @@ export function normalizeGmailMessage(input: unknown): MailboxMessage | null {
     source: 'gmail',
     senderName: sender.name,
     senderAddress: sender.address,
+    senderRelay: sender.relay,
     subject: compact(header(message.payload, 'subject'), 500) ?? '(no subject)',
     body,
     receivedAt,
@@ -372,6 +432,7 @@ export function normalizeOutlookMessage(input: unknown): MailboxMessage | null {
     source: 'outlook',
     senderName: compact(message.from?.emailAddress.name, 320),
     senderAddress: address,
+    senderRelay: null,
     subject: compact(message.subject, 500) ?? '(no subject)',
     body,
     receivedAt,
@@ -494,9 +555,13 @@ export class MailboxManager implements MailboxManagerLike {
     if (deletionError) throw deletionError;
   }
 
-  async listMessages(provider: MailProvider): Promise<MailboxMessage[]> {
+  async listMessages(
+    provider: MailProvider,
+    purpose: MailboxPurpose = 'temporary_action',
+  ): Promise<MailboxMessage[]> {
     await this.initialize();
-    if (provider === 'gmail') return this.listGmailMessages();
+    if (provider === 'gmail') return this.listGmailMessages(purpose);
+    if (purpose === 'easyjet_booking_lookup') return [];
     return this.listOutlookMessages();
   }
 
@@ -692,13 +757,15 @@ export class MailboxManager implements MailboxManagerLike {
     return typeof value === 'string' ? compact(value, 320) : null;
   }
 
-  private async listGmailMessages(): Promise<MailboxMessage[]> {
+  private async listGmailMessages(purpose: MailboxPurpose): Promise<MailboxMessage[]> {
     const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
     listUrl.searchParams.set('maxResults', '20');
     listUrl.searchParams.set('includeSpamTrash', 'false');
     listUrl.searchParams.set(
       'q',
-      'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
+      purpose === 'easyjet_booking_lookup'
+        ? 'newer_than:5y -in:spam -in:trash subject:"easyJet booking reference"'
+        : 'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
     );
     const listResponse = await this.providerFetch('gmail', listUrl.toString());
     const list = (await listResponse.json()) as { messages?: Array<{ id?: unknown }> };
@@ -713,7 +780,14 @@ export class MailboxManager implements MailboxManagerLike {
         return normalizeGmailMessage(await response.json());
       }),
     );
-    return messages.filter((message): message is MailboxMessage => Boolean(message)).slice(0, 10);
+    const normalized = messages.filter((message): message is MailboxMessage => Boolean(message));
+    if (purpose === 'easyjet_booking_lookup') {
+      return normalized
+        .filter(isVerifiedEasyJetBookingMessage)
+        .map((message) => ({ ...message, serviceHint: 'easyJet' }))
+        .slice(0, 12);
+    }
+    return normalized.slice(0, 10);
   }
 
   private async listOutlookMessages(): Promise<MailboxMessage[]> {

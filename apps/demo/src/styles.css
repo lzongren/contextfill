@@ -278,6 +278,32 @@ main {
     0 24px 70px rgba(16, 35, 31, 0.12);
 }
 
+body[data-contextfill-scenario^='capsule'] .stage {
+  align-content: start;
+  justify-items: start;
+  padding-right: min(440px, 32vw);
+}
+
+body[data-contextfill-scenario^='capsule'] .service-card {
+  width: min(100%, 580px);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.8), transparent 42%), var(--cream);
+}
+
+.capsule-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.capsule-fields .code-field {
+  min-width: 0;
+}
+
+input[data-contextfill-capsule-filled='true'] {
+  border-color: #7eb547;
+  background: #f4ffe9;
+}
+
 .service-brand {
   display: flex;
   align-items: center;
@@ -468,6 +494,13 @@ main {
   line-height: 1.55;
 }
 
+@media (max-width: 1120px) {
+  body[data-contextfill-scenario^='capsule'] .stage {
+    justify-items: center;
+    padding-right: 36px;
+  }
+}
+
 @media (max-width: 760px) {
   .topbar {
     padding: 0 18px;
@@ -504,5 +537,9 @@ main {
   .simulation-banner code {
     grid-row: auto;
     grid-column: auto;
+  }
+
+  .capsule-fields {
+    grid-template-columns: 1fr;
   }
 }

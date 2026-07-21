@@ -123,6 +123,24 @@ describe('field detection and filling', () => {
     expect(target?.elements[0]?.value).toBe('CT-7K92Q');
   });
 
+  it('uses the current easyJet input label instead of shared form text for a reference', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Surname(s)<input aria-label="Please enter a valid surname to find your booking" placeholder="Surname(s)" data-contextfill-visible="true"></label>
+        <label>Booking reference<input aria-label="Please enter a valid booking reference to find your booking" placeholder="Booking reference" data-contextfill-visible="true"></label>
+        <label><input type="checkbox" data-contextfill-visible="true">Permission to manage booking</label>
+        <button>Find Booking</button>
+      </form>`;
+
+    const target = findReferenceField(document);
+    expect(target?.kind).toBe('reference');
+    expect(target?.elements[0]?.placeholder).toBe('Booking reference');
+    expect(fillTransferValue(target!, 'EZ7TEST')).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('input[placeholder="Surname(s)"]')?.value).toBe(
+      '',
+    );
+  });
+
   it('does not classify a generic order-number input as a trusted reference target', () => {
     document.body.innerHTML = `<label>Order number<input name="orderNumber" data-contextfill-visible="true"></label>`;
     expect(findReferenceField(document)).toBeNull();

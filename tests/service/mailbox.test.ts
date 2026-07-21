@@ -57,6 +57,29 @@ function gmailMagicLinkMessage(id = 'gmail-magic-link') {
   };
 }
 
+function gmailEasyJetMessage(
+  id = 'gmail-easyjet',
+  from = '"confirmation@easyJet.com" <private_alias_at_easyjet_com_random@icloud.com>',
+) {
+  return {
+    id,
+    internalDate: String(new Date('2024-08-10T12:00:00.000Z').getTime()),
+    snippet: 'Your easyJet booking details.',
+    payload: {
+      mimeType: 'text/plain',
+      headers: [
+        { name: 'From', value: from },
+        { name: 'Subject', value: 'easyJet booking reference: EZ7TEST' },
+      ],
+      body: {
+        data: encoded(
+          'Hi, Sample; here are details for your booking EZ7TEST. Manage it at https://www.easyjet.com/en.',
+        ),
+      },
+    },
+  };
+}
+
 function outlookMessage(id = 'outlook-message-1') {
   return {
     id,
@@ -108,6 +131,25 @@ describe('mailbox message normalization', () => {
     expect(normalized?.body).toContain(
       'https://login.cedarnotes.example/confirm/private-token?nonce=secret&source=email',
     );
+  });
+
+  it('normalizes a valid Apple Hide My Email sender as explicit relay evidence', () => {
+    expect(normalizeGmailMessage(gmailEasyJetMessage())).toMatchObject({
+      senderName: 'confirmation@easyJet.com',
+      senderAddress: 'private_alias_at_easyjet_com_random@icloud.com',
+      senderRelay: {
+        kind: 'apple_hide_my_email',
+        originalAddress: 'confirmation@easyjet.com',
+      },
+    });
+    expect(
+      normalizeGmailMessage(
+        gmailEasyJetMessage(
+          'gmail-forged-relay',
+          '"confirmation@easyJet.com" <private_alias_at_attacker_com_random@icloud.com>',
+        ),
+      )?.senderRelay,
+    ).toBeNull();
   });
 });
 
@@ -240,6 +282,56 @@ describe('mailbox OAuth and provider adapters', () => {
       credentialStorage: 'os-keychain',
     });
     expect(await manager.listMessages('outlook')).toHaveLength(1);
+  });
+
+  it('uses a bounded five-year easyJet query and returns only verified confirmations', async () => {
+    const credentialStore = new FakeCredentialStore();
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return Response.json({ access_token: 'google-access', refresh_token: 'google-refresh' });
+      }
+      if (url.endsWith('/users/me/profile')) {
+        return Response.json({ emailAddress: 'person@gmail.example' });
+      }
+      if (url.includes('/users/me/messages?')) {
+        const query = new URL(url).searchParams.get('q');
+        expect(query).toBe('newer_than:5y -in:spam -in:trash subject:"easyJet booking reference"');
+        return Response.json({
+          messages: [{ id: 'gmail-easyjet' }, { id: 'gmail-forged-relay' }],
+        });
+      }
+      if (url.includes('/users/me/messages/gmail-easyjet?format=full')) {
+        return Response.json(gmailEasyJetMessage());
+      }
+      if (url.includes('/users/me/messages/gmail-forged-relay?format=full')) {
+        return Response.json(
+          gmailEasyJetMessage(
+            'gmail-forged-relay',
+            '"confirmation@easyJet.com" <private_alias_at_attacker_com_random@icloud.com>',
+          ),
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const manager = new MailboxManager(
+      {
+        CONTEXTFILL_GOOGLE_CLIENT_ID: 'google-client',
+        CONTEXTFILL_GOOGLE_CLIENT_SECRET: 'google-secret',
+      },
+      fetcher as typeof fetch,
+      () => now.getTime(),
+      credentialStore,
+    );
+    const authorizationUrl = new URL(await manager.beginConnection('gmail'));
+    await manager.completeConnection(
+      'gmail',
+      'authorization-code',
+      authorizationUrl.searchParams.get('state')!,
+    );
+    const messages = await manager.listMessages('gmail', 'easyjet_booking_lookup');
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ serviceHint: 'easyJet', id: 'gmail:gmail-easyjet' });
   });
 
   it('restores a refresh token from the OS keychain and refreshes on first use', async () => {

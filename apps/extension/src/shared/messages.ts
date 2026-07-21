@@ -1,4 +1,8 @@
-import type { PageContext } from '../../../../packages/core/src/index.js';
+import type {
+  ContextCapsule,
+  MailboxMessage,
+  PageContext,
+} from '../../../../packages/core/src/index.js';
 import type { ActivityRecord, AutomationMode, AutomationSiteRule } from '../automation-settings.js';
 
 export type AutomaticPageSignal = {
@@ -25,9 +29,20 @@ export type ContentRequest =
       authorized: true;
     }
   | { type: 'SHOW_AUTOMATION_OVERLAY'; view: AutomationOverlayView }
-  | { type: 'HIDE_AUTOMATION_OVERLAY' };
+  | { type: 'HIDE_AUTOMATION_OVERLAY' }
+  | {
+      type: 'SHOW_EASYJET_CAPSULE';
+      capsule: ContextCapsule;
+      message: MailboxMessage;
+    };
 export type ContentResponse =
-  | { ok: true; page?: PageContext; automation?: AutomaticPageSignal; filled?: true }
+  | {
+      ok: true;
+      page?: PageContext;
+      automation?: AutomaticPageSignal;
+      filled?: true;
+      capsuleShown?: true;
+    }
   | { ok: false; error: string };
 
 export type BackgroundRequest =

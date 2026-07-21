@@ -8,6 +8,8 @@ export const mailSourceSchema = z.enum(['synthetic', 'gmail', 'outlook', 'import
 export type MailProvider = z.infer<typeof mailProviderSchema>;
 export type MailSource = z.infer<typeof mailSourceSchema>;
 export type PersistentMailSource = Exclude<MailSource, 'import'>;
+export const mailboxPurposeSchema = z.enum(['temporary_action', 'easyjet_booking_lookup']);
+export type MailboxPurpose = z.infer<typeof mailboxPurposeSchema>;
 
 const providerStatusSchema = z
   .object({
@@ -116,8 +118,14 @@ export async function disconnectMailProvider(provider: MailProvider): Promise<vo
   await serviceRequest(`/mail/disconnect/${provider}`, { method: 'POST' });
 }
 
-export async function fetchMailboxMessages(provider: MailProvider): Promise<MailboxMessage[]> {
-  return messagesResponseSchema.parse(await serviceRequest(`/mail/messages/${provider}`)).messages;
+export async function fetchMailboxMessages(
+  provider: MailProvider,
+  purpose: MailboxPurpose = 'temporary_action',
+): Promise<MailboxMessage[]> {
+  const query = new URLSearchParams({ purpose });
+  return messagesResponseSchema.parse(
+    await serviceRequest(`/mail/messages/${provider}?${query.toString()}`),
+  ).messages;
 }
 
 export async function loadMailSource(): Promise<PersistentMailSource> {

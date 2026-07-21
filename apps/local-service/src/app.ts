@@ -1,19 +1,22 @@
 import { Hono, type Context } from 'hono';
 import {
   syntheticMessageSchema,
+  type ContextCapsule,
   type SyntheticMessage,
   type VerificationCandidate,
 } from '../../../packages/core/src/index.js';
-import { extractWithGpt } from './extractor.js';
+import { extractCapsuleWithGpt, extractWithGpt } from './extractor.js';
 import {
   createMailboxManager,
   MailboxError,
+  mailboxPurposeSchema,
   mailProviderSchema,
   type MailboxManagerLike,
 } from './mailbox.js';
 import { createPairingManager, type PairingManager } from './pairing.js';
 
 type Extractor = (message: SyntheticMessage) => Promise<VerificationCandidate>;
+type CapsuleExtractor = (message: SyntheticMessage) => Promise<ContextCapsule>;
 
 const allowedOrigin = (origin: string | undefined): boolean => {
   if (!origin) return true;
@@ -28,6 +31,7 @@ export function createServiceApp(
   extractor: Extractor = extractWithGpt,
   mailbox: MailboxManagerLike = createMailboxManager(),
   pairing: PairingManager = createPairingManager(),
+  capsuleExtractor: CapsuleExtractor = extractCapsuleWithGpt,
 ) {
   const app = new Hono();
   app.use('*', async (context, next) => {
@@ -186,8 +190,12 @@ export function createServiceApp(
     }
     const provider = mailProviderSchema.safeParse(context.req.param('provider'));
     if (!provider.success) return context.json({ error: 'unsupported_provider' }, 404);
+    const purpose = mailboxPurposeSchema.safeParse(
+      context.req.query('purpose') ?? 'temporary_action',
+    );
+    if (!purpose.success) return context.json({ error: 'unsupported_mailbox_purpose' }, 400);
     try {
-      return context.json({ messages: await mailbox.listMessages(provider.data) });
+      return context.json({ messages: await mailbox.listMessages(provider.data, purpose.data) });
     } catch (error) {
       const failure = mailboxError(error);
       return context.json(
@@ -247,6 +255,37 @@ export function createServiceApp(
       const message = syntheticMessageSchema.parse(body.message);
       const candidate = await extractor(message);
       return context.json({ candidate });
+    } catch {
+      return context.json({ fallback: true, reason: 'invalid_or_unavailable' }, 502);
+    }
+  });
+
+  app.post('/extract/capsule', async (context) => {
+    const authorization = await pairing.authorize(
+      extensionOrigin(context),
+      pairingSecret(context.req.header('x-contextfill-pairing')),
+    );
+    if (!authorization.ok) {
+      return context.json(
+        { error: authorization.error, message: authorization.message },
+        authorization.status,
+      );
+    }
+    if (!process.env.OPENAI_API_KEY && capsuleExtractor === extractCapsuleWithGpt) {
+      return context.json({ fallback: true, reason: 'not_configured' }, 503);
+    }
+    const contentLength = Number(context.req.header('content-length') ?? 0);
+    if (contentLength > 12_000) {
+      return context.json({ fallback: true, reason: 'request_too_large' }, 413);
+    }
+    try {
+      const raw = await context.req.text();
+      if (raw.length > 12_000) {
+        return context.json({ fallback: true, reason: 'request_too_large' }, 413);
+      }
+      const body = JSON.parse(raw) as { message?: unknown };
+      const message = syntheticMessageSchema.parse(body.message);
+      return context.json({ capsule: await capsuleExtractor(message) });
     } catch {
       return context.json({ fallback: true, reason: 'invalid_or_unavailable' }, 502);
     }

@@ -20,7 +20,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 - The extension stores its random pairing capability, selected source, explicit model opt-in, exact-origin automation rules, session-only replay IDs, and privacy-minimized activity outcomes. The activity schema excludes codes, URLs/tokens, subjects, senders, bodies, and page paths; it keeps at most 24 records for seven days. Chrome storage is restricted to trusted extension contexts; message bodies, candidate values, provider tokens, and account authorization never enter it.
 - Real mailbox messages use deterministic local extraction by default. Sending a prefiltered real message through the optional GPT-5.6 extractor requires a separate explicit toggle in the source screen.
 - Imported `.eml` files are capped at 2 MB and parsed with explicit MIME nesting and header-size limits. HTML is converted to inert text plus HTTP(S) link evidence; scripts, styles, templates, and attachments do not enter extraction.
-- Gmail queries only temporary-action phrases from the last day and fetches at most 12 bodies with Spam and Trash explicitly excluded; move a legitimate message to the inbox before scanning. Outlook reads only the Inbox, filters 25 recent summaries locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
+- Gmail normally queries only temporary-action phrases from the last day, explicitly excludes Spam and Trash, and fetches at most 12 bodies; move a legitimate message to the inbox before scanning. The explicit easyJet booking-lookup route is a separate exception: only on the exact official booking-dialog page, it requests subjects matching `easyJet booking reference` from the last five years, still excludes Spam and Trash, strictly verifies sender/domain evidence, returns at most 12 confirmations, and requires the user to choose a masked booking. Outlook reads only the Inbox, filters 25 recent summaries locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
 - HTML-only message normalization preserves HTTPS anchor destinations as inert text. It does not load images, execute HTML, fetch destinations, or follow redirects.
 - Disconnect clears memory, deletes the keychain refresh credential, and makes a best-effort Google revocation request.
 - ContextFill still requires deterministic `allow` before any Assisted or automatic action. Auto-Continue requires explicit per-origin opt-in and shows a cancellable three-second in-page countdown; it revalidates the page and policy immediately before acting. The extension never clicks or invokes form submission, although a destination page may submit from its own input handler after the final OTP digit.
@@ -99,6 +99,17 @@ If the browser capability is lost or you intentionally want to pair another inst
 Keychain failure does not break the connector, but both pairing and provider authorization become session-only and must be repeated after the service stops. The source screen makes that downgrade visible.
 
 ## Gmail
+
+### Private easyJet booking lookup
+
+1. Open `https://www.easyjet.com/en?accntmdl=2` and select **Find Booking** so the visible surname and booking-reference fields are present.
+2. Open ContextFill, grant access only to `https://www.easyjet.com/*` if Chrome requests it, and select the connected Gmail source.
+3. Choose one masked confirmation. ContextFill refuses to choose automatically when several bookings exist.
+4. If the message explicitly states the passenger surname, review the two-fact Capsule, transfer both facts, confirm the no-submit receipt, and use **Undo** to restore both fields if testing.
+5. If the message contains only a greeting name and booking reference, choose the clearly labeled reference-only transfer and type the surname manually on easyJet; ContextFill will not guess it.
+6. ContextFill never checks the consent box or presses **Find Booking**. Do not submit during conformance testing.
+
+Apple Hide My Email forwarding is supported only when the envelope sender is an `icloud.com` relay whose local part encodes the same domain as the apparent original easyJet address. A display name alone is never sender evidence. Raw relay addresses, booking references, surnames, and message bodies are not logged or persisted.
 
 1. Create or choose a Google Cloud project and enable the Gmail API.
 2. Configure the OAuth consent screen. During development, keep the app in testing mode and add your own Google account as a test user.

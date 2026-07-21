@@ -46,13 +46,16 @@ function ancestorText(element: HTMLElement): string {
 }
 
 function fieldText(input: HTMLInputElement): string {
+  return [localFieldText(input), ancestorText(input)].join(' ');
+}
+
+function localFieldText(input: HTMLInputElement): string {
   return [
     input.name,
     input.id,
     input.placeholder,
     input.getAttribute('aria-label') ?? '',
     labelText(input),
-    ancestorText(input),
   ].join(' ');
 }
 
@@ -110,7 +113,9 @@ export function scoreVerificationField(input: HTMLInputElement): number {
 export function scoreReferenceField(input: HTMLInputElement): number {
   if (!isVisibleAndEnabled(input)) return -Infinity;
   if (!['text', 'search'].includes(input.type || 'text')) return -Infinity;
-  const text = fieldText(input);
+  // Reference evidence must belong to this control. Shared form text can mention a booking
+  // reference beside an unrelated surname field and must never make both inputs candidates.
+  const text = localFieldText(input);
   let score = 0;
   if (referenceWords.test(text)) score += 75;
   if (

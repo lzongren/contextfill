@@ -1,5 +1,89 @@
 import { expect, test } from '@playwright/test';
 
+test('verified context capsule transfers two masked facts, never submits, and undoes', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=capsule');
+  expect(await page.evaluate(() => window.contextFillCapsuleHarness.inspect())).toMatchObject({
+    decision: 'allow',
+    reasonCode: 'aligned',
+    mappingDecision: 'ready',
+  });
+  const overlay = page.locator('#contextfill-capsule-host');
+  await expect(overlay).toBeAttached();
+  await expect(overlay).not.toContainText('AU-47K2');
+  await expect(overlay).not.toContainText('Rivera');
+  await page.getByRole('button', { name: 'Transfer 2 verified facts' }).click();
+  await expect(page.locator('#bookingReference')).toHaveValue('AU-47K2');
+  await expect(page.locator('#passengerSurname')).toHaveValue('Rivera');
+  await expect(page.locator('#verification-form')).toHaveAttribute('data-submit-count', '0');
+  await expect(page.getByText('2 verified facts transferred. Form not submitted.')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo entire handoff' }).click();
+  await expect(page.locator('#bookingReference')).toHaveValue('');
+  await expect(page.locator('#passengerSurname')).toHaveValue('');
+  await expect(page.getByText(/Both original field values were restored/)).toBeVisible();
+});
+
+test('capsule trust stops on a lookalike without mutating either field', async ({ page }) => {
+  await page.goto('/?scenario=capsule-lookalike');
+  expect(await page.evaluate(() => window.contextFillCapsuleHarness.inspect())).toMatchObject({
+    decision: 'block',
+    reasonCode: 'lookalike',
+  });
+  await expect(page.getByText('Transfer blocked')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Transfer 2 verified facts' })).toHaveCount(0);
+  await expect(page.locator('#bookingReference')).toHaveValue('');
+  await expect(page.locator('#passengerSurname')).toHaveValue('');
+  await expect(page.locator('#verification-form')).toHaveAttribute('data-submit-count', '0');
+});
+
+test('capsule ignores hidden and unrelated decoys', async ({ page }) => {
+  await page.goto('/?scenario=capsule-decoy');
+  await page.getByRole('button', { name: 'Transfer 2 verified facts' }).click();
+  await expect(page.locator('#bookingReference')).toHaveValue('AU-47K2');
+  await expect(page.locator('#passengerSurname')).toHaveValue('Rivera');
+  await expect(page.locator('#loyaltyNumber')).toHaveValue('');
+  await expect(page.locator('#hiddenBookingDecoy')).toHaveValue('DO-NOT-CHANGE');
+  await expect(page.locator('#verification-form')).toHaveAttribute('data-submit-count', '0');
+});
+
+test('conflict, stale, and non-empty capsule scenarios all preserve the page', async ({ page }) => {
+  for (const [scenario, reasonCode] of [
+    ['capsule-conflict', 'conflicting_messages'],
+    ['capsule-stale', 'stale'],
+  ]) {
+    await page.goto(`/?scenario=${scenario}`);
+    expect(await page.evaluate(() => window.contextFillCapsuleHarness.inspect())).toMatchObject({
+      decision: 'block',
+      reasonCode,
+    });
+    await expect(page.getByRole('button', { name: 'Transfer 2 verified facts' })).toHaveCount(0);
+    await expect(page.locator('#bookingReference')).toHaveValue('');
+    await expect(page.locator('#passengerSurname')).toHaveValue('');
+  }
+
+  await page.goto('/?scenario=capsule-non-empty');
+  expect(await page.evaluate(() => window.contextFillCapsuleHarness.inspect())).toMatchObject({
+    decision: 'allow',
+    mappingDecision: 'block',
+    mappingReasonCode: 'non_empty_field',
+  });
+  await expect(page.getByRole('button', { name: 'Transfer 2 verified facts' })).toHaveCount(0);
+  await expect(page.locator('#passengerSurname')).toHaveValue('User entered');
+  await expect(page.locator('#bookingReference')).toHaveValue('');
+});
+
+test('reduced-motion capsule keeps the complete trust and mapping chain understandable', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?scenario=capsule-reduced-motion');
+  await expect(page.getByText('Trust signals aligned')).toBeVisible();
+  await expect(page.getByText('2 typed facts · values remain masked')).toBeVisible();
+  await expect(page.getByText('Unique field map ready')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Transfer 2 verified facts' })).toBeEnabled();
+});
+
 test('legitimate single-field fixture fills but never submits', async ({ page }) => {
   await page.goto('/?scenario=legitimate-single');
   await expect(page.getByText('SIMULATED ACTIVE DOMAIN')).toBeVisible();
@@ -123,6 +207,15 @@ declare global {
         fieldCount: number;
       };
       fill: () => boolean;
+    };
+    contextFillCapsuleHarness: {
+      inspect: () => {
+        decision: string;
+        reasonCode: string;
+        mappingDecision: string;
+        mappingReasonCode: string;
+      };
+      undo: () => boolean;
     };
   }
 }

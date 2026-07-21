@@ -1,45 +1,57 @@
 # Under-three-minute demo script
 
-Target spoken time: about 2 minutes 50 seconds. Leave pauses for the visible countdown.
+Target spoken time: about 2 minutes 50 seconds. Leave pauses for the Capsule transfer and visible Auto-Continue countdown.
 
-## 0:00–0:20 — Problem
+## 0:00–0:18 — Problem
 
-“‘Check your email’ breaks the task. We leave the site, find the right message, decide whether a one-time link is real, and return to the correct page. OTP autofill solves one narrow format, but it does not provide a transparent trust decision for the broader handoff.”
+[Show a synthetic check-in page beside a “check your email” state.]
 
-## 0:20–0:40 — Product and boundary
+“Email is often the missing step inside another task. We hunt for the right message, decide whether it belongs to this page, then copy facts or follow a link without a visible trust proof.”
 
-“ContextFill safely removes that interruption. On a site I explicitly configure, it detects the email wait state, finds an OTP or magic link, and deterministic code—not the model—checks sender, service, destination, active page, freshness, expiry, and replay. It shows every step in page, gives me time to cancel, and revalidates before acting.”
+## 0:18–0:35 — Product and boundary
 
-## 0:40–1:20 — Verified magic-link handoff
+“ContextFill turns the right message into a temporary, origin-bound handoff. A model may extract bounded facts, but deterministic code owns sender, service, domain, freshness, replay, target mapping, and execution. It never prefollows a link, touches the clipboard, clicks Submit, or calls a form-submission API.”
 
-[On **Allow · magic link**, open ContextFill once, choose **Automation → Auto-Continue**, acknowledge the site behavior, then return to the page.]
+## 0:35–1:05 — Verified Context Capsule
 
-“Every new site starts Manual. I granted only this exact origin. Now the popup is closed: ContextFill finds Cedar Notes’ sign-in link without fetching it, shows a local trust progression, and permanently masks the token-bearing path. The page, sender, and destination align.”
+[Open **Capsule · verified**. Hold the complete four-stage trace, then approve the transfer and click Undo.]
 
-“During this three-second countdown I can cancel. ContextFill performs no prefetch, HEAD request, redirect following, clipboard copy, or hidden submit.”
+“This recent Aurelia message becomes a 90-second capsule with exactly two masked facts. The trace proves Message → trust checks → capsule → two unique fields. One click transfers both or neither. The receipt says the form was not submitted; Undo restores both fields while replay stays blocked.”
+
+[Open **Capsule · lookalike**.]
+
+“Remove one hyphen from the simulated airline domain and the chain breaks visibly—no transfer button, no override, no changed field.”
+
+## 1:05–1:43 — Verified Auto-Continue
+
+[On **Allow · magic link**, open ContextFill once, choose **Automation → Auto-Continue**, acknowledge the site behavior, then reload the fixture and close the popup.]
+
+“For OTP and verified-link wait states, every origin starts Manual. I explicitly granted only this exact origin. ContextFill now detects the wait state, finds the matching message, masks the one-time link, and shows a cancellable three-second verification countdown.”
 
 [Let the countdown finish.]
 
-“It rechecked the exact tab URL, page intent, permission, freshness, replay, and deterministic Allow decision, then updated only this tab. The synthetic `.test` target maps to an honestly labeled local completion page. The candidate is now marked used.”
+“At zero it rechecks the unchanged tab, current page intent, permission and mode, freshness, replay, and deterministic Allow decision. Only then does it update this same tab. It never clicks a page button; an Auto OTP opt-in separately warns that a destination page may react to the last digit.”
 
-## 1:20–1:52 — Lookalike block
+## 1:43–2:00 — Auto block and revocation
 
-[Open **Block · link lookalike**; do not open the popup.]
+[Open **Block · link lookalike** with a fresh unused candidate.]
 
-“Now the initiating site is `cedarn0tes.test`, with a zero, while the message link targets `cedarnotes.test`. The in-page card stops automatically. ContextFill compares registrable domains and controlled lookalike signals, blocks the action, keeps the token masked, and exposes no override.”
+“On `cedarn0tes.test`, with a zero, sender and link remain legitimate but the requesting site does not. The in-page card stops, records the lookalike reason, and exposes no action. Trusted-site settings revoke both the rule and exact-origin permission.”
 
-## 1:52–2:12 — General transfer primitive
+## 2:00–2:20 — GPT-5.6 and privacy
 
-[Open **Allow · reference**, approve **Fill reference**.]
+“The optional loopback companion can use GPT-5.6 to extract one prefiltered message into a strict schema. For a capsule it can return only service/domain evidence, booking reference, and passenger surname—never selectors or authority. Without a key, every judge path uses deterministic extraction.”
 
-“The same engine is not hard-coded to login. In Manual mode it extracts a booking reference, verifies the message-to-site context, and fills only the explicitly labeled field. It never submits. OTPs can run in Assisted mode or fill after the same visible Auto countdown.”
+## 2:20–2:42 — Codex
 
-## 2:12–2:32 — GPT-5.6 and privacy boundary
+“I used Codex from architecture through implementation, real Gmail integration, security review, adversarial testing, visual QA, packaging, and release automation. Independent product, interaction, and security reviews shaped the Capsule’s atomic rollback and Auto-Continue’s exact-site opt-in, visible cancellation, action-time revalidation, and privacy-safe history.”
 
-“The optional loopback companion can use GPT-5.6 to classify one prefiltered message into a strict schema. Application code verifies copied evidence, rejects high-risk recovery, payment, and signing links, and independently authorizes every action. Without a key—or on any model failure—the deterministic path remains fully functional.”
+## 2:42–2:50 — Close
 
-## 2:32–2:48 — Codex collaboration and close
+“ContextFill is a hackathon prototype, not phishing-proof. Its idea is simple: make message context, destination, and control visible before email advances the task.”
 
-“I used Codex from architecture through implementation, real Gmail integration, security review, browser testing, packaging, and release automation. Human testing corrected real-site permissions and field detection, then product review made verified magic-link handoff the differentiated core.”
+## Recording hygiene
 
-“ContextFill is a hackathon prototype, not phishing-proof. Its idea is simple: remove the email interruption without hiding context, destination, or control.”
+- Record only synthetic fixtures in a clean browser profile.
+- Do not show a real inbox, account identifier, personal address, key, fallback code, token, or terminal environment.
+- Verify the public cut remains under three minutes.
