@@ -14,5 +14,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["http://127.0.0.1/*"],
+      "js": ["capsule-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "minimum_chrome_version": "114"
 }

@@ -85,3 +85,19 @@ Generic numbers and order IDs create unacceptable false positives. Deterministic
 ## D-021: Mixed login messages prefer the verified link without duplicating secrets
 
 Real providers may send a fallback OTP and a one-time link in the same message. When both are present, ContextFill selects the verified-link action; OTP-only messages retain their existing behavior. Supporting excerpts replace the exact URL with a fixed withheld marker and remain schema-bounded, while confirmation subjects mask embedded fallback codes. Gmail's normal bounded query intentionally does not opt into Spam or Trash; a legitimate message must be moved to the inbox before ContextFill will act on it.
+
+## D-022: Verified Context Capsules are the multi-fact hero flow
+
+The differentiated product story is now an origin-bound, short-lived capsule that carries exactly the facts a current task needs. The first capsule is deliberately narrow: one recent airline check-in message, one booking reference, one passenger surname, one aligned service/domain, and exactly two safe targets. Its compact presentation makes the complete chain visible as Message → deterministic trust checks → masked capsule → destination plan. Existing magic-link, reference, and OTP flows remain supported examples of the same boundary.
+
+## D-023: Extraction, authorization, mapping, and execution remain separate authorities
+
+Deterministic extraction or GPT-5.6 may produce only strict source-grounded facts. Neither path can return selectors, field targets, or an authorization result. Deterministic policy owns sender/service/origin/freshness/expiry/replay checks; a separate conservative mapper owns visible, enabled, empty, same-container target selection; execution revalidates both at action time. This separation ensures a high-confidence model output cannot bypass domain policy or choose a malicious field.
+
+## D-024: Capsule transfer is atomic, reversible, and non-replayable after Undo
+
+A two-fact handoff is useful only if its receipt is truthful. Execution therefore snapshots both targets, applies values using native setters, verifies every post-set value, and rolls back all prior changes when either assignment is rejected or rewritten. Successful execution marks the capsule used before presenting a receipt. Undo restores only unchanged transferred values and intentionally preserves replay state; it is a page-state reversal, not renewed authorization. No path submits the form.
+
+## D-025: Synthetic capsule activation uses a closed allowlist
+
+The manifest must inject the capsule entry on loopback so the packaged judge flow is automatic, but loopback metadata is untrusted. The entry therefore mounts only for the root path on exact origins `http://127.0.0.1:4173` and `http://127.0.0.1:4179` plus a closed scenario-to-host-and-service mapping. Prefix matching, arbitrary ports, localhost aliases, other paths, and caller-provided host/service combinations are rejected. Port `4173` is the human judge lab; `4179` is dedicated to automated acceptance tests so concurrent development servers cannot be mistaken for the product fixture.

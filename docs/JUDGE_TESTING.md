@@ -29,7 +29,42 @@ npm run demo
 
 Open [http://127.0.0.1:4173](http://127.0.0.1:4173). The lab visibly distinguishes its real localhost origin from each **SIMULATED ACTIVE DOMAIN**. Simulated hostnames are deterministic test fixtures, not deployed domains.
 
-## 4. Required path A — verified magic-link handoff
+## 4. Required path A — Verified Context Capsule
+
+1. Open [the airline check-in fixture](http://127.0.0.1:4173/?scenario=capsule). The capsule appears in the page; the synthetic hero path does not require opening the extension popup.
+2. Confirm the page visibly distinguishes its real loopback origin from the simulated `checkin.aurelia-air.test` origin.
+3. Read the compact trace: **Message → deterministic trust checks → masked capsule → two destination fields**.
+4. Expected pre-action state:
+   - The booking reference, passenger surname, and any occurrence of either in the subject are masked.
+   - Sender, claimed service, page domain, message freshness, replay, and exact two-field mapping checks pass.
+   - The plan names only **Booking reference** and **Passenger surname**.
+   - Both fields are still empty and the form submit count is zero.
+5. Click **Transfer 2 verified facts**.
+6. Expected receipt:
+   - Booking reference is `AU-47K2` and passenger surname is `Rivera`.
+   - No other control changes.
+   - The receipt says **2 verified facts transferred. Form not submitted.**
+7. Click **Undo**. Both fields return to their original values, but the capsule remains marked used and cannot be replayed.
+
+## 5. Required path B — capsule lookalike block
+
+1. Open [the capsule lookalike fixture](http://127.0.0.1:4173/?scenario=capsule-lookalike).
+2. Confirm the simulated origin is `checkin.aureliaair.test`, with the airline-name hyphen removed, while the message evidence belongs to `aurelia-air.test`.
+3. Expected result: the trust trace identifies the origin mismatch, displays **Blocked**, keeps both facts masked, and exposes no transfer button or field mutation.
+
+## 6. Capsule safety fixtures
+
+| Fixture                                                                            | Expected result                                                                |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`capsule-decoy`](http://127.0.0.1:4173/?scenario=capsule-decoy)                   | Hidden/decoy controls are ignored; only the two visible safe fields are mapped |
+| [`capsule-conflict`](http://127.0.0.1:4173/?scenario=capsule-conflict)             | Conflicting passenger surname evidence blocks before mapping                   |
+| [`capsule-stale`](http://127.0.0.1:4173/?scenario=capsule-stale)                   | Stale message blocks                                                           |
+| [`capsule-non-empty`](http://127.0.0.1:4173/?scenario=capsule-non-empty)           | Prefilled target blocks rather than overwriting                                |
+| [`capsule-reduced-motion`](http://127.0.0.1:4173/?scenario=capsule-reduced-motion) | The same trust and transfer behavior runs without motion                       |
+
+The packaged content script also checks an exact code-level activation allowlist. Only the root path of the judge origin on port `4173`, the dedicated automated-test origin on port `4179`, and known scenario/host/service tuples may mount the trusted-looking overlay; arbitrary loopback pages fail closed.
+
+## 7. Verified magic-link handoff
 
 1. Select **Allow · magic link**, or open [the magic-link fixture](http://127.0.0.1:4173/?scenario=magic-link).
 2. Confirm the visible simulated domain is `login.cedarnotes.test`.
@@ -49,7 +84,7 @@ Open [http://127.0.0.1:4173](http://127.0.0.1:4173). The lab visibly distinguish
    - The fixture explicitly says the non-resolving `.test` link was mapped locally; localhost is not presented as the real destination.
    - Reopening the source fixture and ContextFill immediately blocks the same link as already used.
 
-## 5. Required path B — magic-link lookalike block
+## 8. Magic-link lookalike block
 
 1. Select **Block · link lookalike**, or open [the magic-link lookalike fixture](http://127.0.0.1:4173/?scenario=magic-link-lookalike).
 2. Confirm the visible simulated initiating domain is `login.cedarn0tes.test` with a zero, while the message link points to `login.cedarnotes.test`.
@@ -61,7 +96,7 @@ Open [http://127.0.0.1:4173](http://127.0.0.1:4173). The lab visibly distinguish
    - No Open or override action is available.
 5. Close or dismiss the popup. The page must not navigate.
 
-## 6. Required path C — trusted reference transfer
+## 9. Trusted reference transfer
 
 1. Select **Allow · reference**, or open [the reference fixture](http://127.0.0.1:4173/?scenario=reference).
 2. Open ContextFill and confirm the message, sender, service, domain, and explicitly labeled booking-reference field align.
@@ -69,7 +104,7 @@ Open [http://127.0.0.1:4173](http://127.0.0.1:4173). The lab visibly distinguish
 4. The booking-reference field receives `CT-7K92Q`; the unrelated checkbox is unchanged and the form remains unsubmitted.
 5. The **Block · reference site** fixture uses `cedar-travel.test` and must expose no fill action.
 
-## 7. Proven OTP path
+## 10. Proven OTP path
 
 Open [the single-field fixture](http://127.0.0.1:4173/?scenario=legitimate-single), open ContextFill, and click **Fill code**. The input receives `481203`, the form remains unsubmitted, and immediate replay blocks.
 
@@ -77,7 +112,7 @@ Open [the single-field fixture](http://127.0.0.1:4173/?scenario=legitimate-singl
 
 Open [the split-field fixture](http://127.0.0.1:4173/?scenario=legitimate-split), open ContextFill, and click **Fill 6 fields**. The fields must read `4 8 1 2 0 3` in order. The checkbox remains unchanged and the form remains unsubmitted.
 
-## 8. Other deterministic gates
+## 11. Other deterministic gates
 
 | Fixture             | Expected result                                                                               |
 | ------------------- | --------------------------------------------------------------------------------------------- |
@@ -106,7 +141,7 @@ The release was verified without a key. A live GPT-5.6 call therefore depends on
 npm run verify
 ```
 
-This checks formatting, lint, types, all unit/integration cases, three production builds, packaged-extension pairing and explicit-action behavior, and installed-Chrome acceptance cases.
+This checks formatting, lint, types, all unit/integration cases, three production builds, packaged-extension capsule/pairing/explicit-action behavior, and installed-Chrome acceptance cases.
 
 ## Troubleshooting
 
