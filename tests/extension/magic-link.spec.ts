@@ -30,7 +30,11 @@ async function startDemoServer(): Promise<Server | null> {
       response.writeHead(200, { 'content-type': contentType(target) });
       response.end(await readFile(target));
     } catch {
-      response.writeHead(404).end();
+      if (!response.headersSent && !response.destroyed) {
+        response.writeHead(404).end();
+      } else {
+        response.destroy();
+      }
     }
   });
   await new Promise<void>((resolveReady, reject) => {
