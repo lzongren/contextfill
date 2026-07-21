@@ -47,7 +47,7 @@
 - [x] Added popup-free OTP fill and same-tab verified magic-link navigation with execution-time URL, hostname, visible-intent, permission, mode, freshness, replay, and deterministic-policy revalidation.
 - [x] Added dynamic SPA wait-state detection, hidden/disabled decoy rejection, competing-message fail-closed selection, page-removed countdown cancellation, reduced-motion support, and exact-origin revocation.
 - [x] Added privacy-preserving local activity history with a strict secret-free schema, 24-record cap, seven-day TTL, clear control, and trusted-site management page.
-- [x] Passed the pre-release Auto-Continue gate: formatting/lint/types, 104 unit/integration tests, three production builds, eight packaged-extension scenarios, and seven judge-browser regressions.
+- [x] Passed the pre-release Auto-Continue gate: formatting/lint/types, 105 unit/integration tests, three production builds, eight packaged-extension scenarios, and seven judge-browser regressions.
 - [ ] Complete fresh real Gmail acceptance in Auto mode on one OTP site and Medium magic-link login; record outcome without exposing a code or token.
 - [ ] Package, publish, and independently download/verify the `v0.2.0-beta.8` public prerelease after the final real-flow acceptance.
 - [ ] Complete a live Outlook connection when an Entra app registration is available; this is not required for the Gmail-backed release.

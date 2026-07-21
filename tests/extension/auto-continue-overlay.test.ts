@@ -51,6 +51,11 @@ describe('Auto-Continue in-page overlay', () => {
     );
     const shadow = document.querySelector<HTMLElement>('#contextfill-auto-continue')!.shadowRoot!;
     expect(shadow.textContent).toContain('Cancel auto action');
+    expect(shadow.querySelector('[role="status"]')?.getAttribute('aria-live')).toBe('assertive');
+    expect(shadow.querySelector('style')?.textContent).toContain(
+      '@media (prefers-reduced-motion: reduce)',
+    );
+    expect(shadow.querySelector('style')?.textContent).toContain('.card { animation: none; }');
     vi.advanceTimersByTime(2_000);
     expect(action).not.toHaveBeenCalledWith('execute');
     vi.advanceTimersByTime(1_000);

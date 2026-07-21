@@ -175,6 +175,7 @@ test('Auto-Continue fills a trusted OTP without the popup action and records no 
   const { context, extensionId } = await extensionContext();
   try {
     const page = await context.newPage();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('http://127.0.0.1:4173/?scenario=legitimate-single');
     const popup = await openAutomationSettings(context, extensionId, page);
     await enableAutoContinue(popup);
@@ -183,6 +184,11 @@ test('Auto-Continue fills a trusted OTP without the popup action and records no 
       'countdown',
     );
     await expect(page.locator('#verificationCode')).toHaveValue('481203', { timeout: 8_000 });
+    await expect(page.locator('#verificationCode')).toHaveAttribute(
+      'data-contextfill-filled',
+      'true',
+    );
+    await expect(page.locator('#verificationCode')).toHaveCSS('transition-property', 'none');
     await expect(page.locator('#verification-form')).toHaveAttribute('data-submit-count', '0');
     await expect(page.locator('#contextfill-auto-continue')).toHaveAttribute(
       'data-state',

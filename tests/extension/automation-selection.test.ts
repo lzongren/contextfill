@@ -41,6 +41,11 @@ describe('automatic candidate selection', () => {
     expect(result).toMatchObject({ status: 'blocked', reasonCode: 'lookalike' });
   });
 
+  it('blocks automatic action when sender evidence conflicts', () => {
+    const result = selectAutomaticCandidate(ranked(messagesForScenario('ambiguous', now)), ['otp']);
+    expect(result).toMatchObject({ status: 'blocked', reasonCode: 'sender_conflict' });
+  });
+
   it('blocks instead of guessing when two different trusted messages compete within 90 seconds', () => {
     const source = makeSyntheticInbox(now).find((message) => message.id === 'northstar-current')!;
     const competing: SyntheticMessage = {

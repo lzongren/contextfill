@@ -4,8 +4,8 @@ Release candidate checked on 2026-07-21 in the local macOS workspace.
 
 | Check                         | Command                                                      | Result                                                |
 | ----------------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
-| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 104 tests passed  |
-| Unit and integration          | `npm test`                                                   | 19 files, 104 tests passed                            |
+| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 105 tests passed  |
+| Unit and integration          | `npm test`                                                   | 19 files, 105 tests passed                            |
 | Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built          |
 | Packaged MV3 acceptance       | `npm run test:extension`                                     | 8 Chromium tests passed                               |
 | Judge-browser acceptance      | `npm run test:browser`                                       | 7 Chromium tests passed                               |
@@ -17,9 +17,9 @@ Release candidate checked on 2026-07-21 in the local macOS workspace.
 | Extension secret-name scan    | `rg` over `dist/extension`                                   | No API-key/OAuth-secret names found                   |
 | Public GitHub prerelease      | Release workflow and downloaded `v0.2.0-beta.8` assets       | Pending tag publication and independent verification  |
 
-The packaged-extension acceptance suite proves that Assisted mode discovers and verifies an OTP without the popup but waits for in-page confirmation; a dynamically inserted SPA dialog triggers the same path; Auto-Continue fills an OTP after a visible countdown without clicking Submit; an aligned magic link opens only the captured tab while a lookalike blocks; cancellation prevents navigation; exact-origin revocation prevents future scanning; and privacy-safe history contains no candidate value. Separate packaged tests cover extension boot and the legacy explicit magic-link/reference path.
+The packaged-extension acceptance suite proves that Assisted mode discovers and verifies an OTP without the popup but waits for in-page confirmation; a dynamically inserted SPA dialog triggers the same path; Auto-Continue fills an OTP after a visible countdown without clicking Submit and suppresses field animation under reduced-motion; an aligned magic link opens only the captured tab while a fresh lookalike blocks before navigation; cancellation prevents navigation; exact-origin revocation prevents future scanning; and privacy-safe history contains no candidate value. Separate packaged tests cover extension boot and the legacy explicit magic-link/reference path.
 
-The installed-Chrome suite covers aligned magic-link context, no navigation during inspection, link lookalike block, trusted reference fill, reference-domain lookalike block, single and split OTP filling, no automatic submission, service mismatch, expiry, sender warning, and unrelated-numeric empty state. Unit and integration coverage adds exact URL extraction, permanent display masking, unsafe scheme/credentials/IP/local/port/punycode/shortener/redirect rejection, destination mismatch, sender conflict, expiry/staleness, replay, model high-risk-action rejection, HTML-only Gmail anchor preservation, mixed code/link precedence, bounded token-free supporting excerpts, subject-level fallback-code masking, strict schema validation, model fallback, and real field mutation events.
+The installed-Chrome suite covers aligned magic-link context, no navigation during inspection, link lookalike block, trusted reference fill, reference-domain lookalike block, single and split OTP filling, no automatic submission, service mismatch, expiry, sender warning, and unrelated-numeric empty state. Unit and integration coverage adds exact URL extraction, permanent display masking, unsafe scheme/credentials/IP/local/port/punycode/shortener/redirect rejection, destination mismatch, sender-conflict automatic blocking, expired and stale links, replay, competing messages, hidden/disabled decoys, explicit Gmail Spam/Trash exclusion, Outlook Inbox-only retrieval, model high-risk-action rejection, HTML-only Gmail anchor preservation, mixed code/link precedence, bounded token-free supporting excerpts, subject-level fallback-code masking, strict schema validation, model fallback, and real field mutation events.
 
 The automated release gate uses injected provider/model responses and does not make paid OpenAI or external mailbox calls. Separately, a user-owned Gmail OAuth connection was completed with read-only scope and OS-keychain refresh persistence, the connector retrieved bounded recent mail, and the user confirmed both a real Gmail-to-Vialto OTP fill and a real Gmail-to-Medium magic-link handoff in ChatGPT Atlas under the prior Manual flow. Fresh real-site Auto-Continue acceptance is required before beta.8 publication. No public media should expose a real token, fallback code, address, or personal message.
 
@@ -35,12 +35,12 @@ The automated release gate uses injected provider/model responses and does not m
 
 - Path: `artifacts/contextfill-extension-v0.2.0-beta.8.zip`
 - Size: 284,476 bytes
-- Local SHA-256: `b9204a34ccc732a68cdd70ad6aca2af03398d300dd2d40ea9318c3fecd32c791`
+- Local SHA-256: `306c2c906aa1e2ec14ebba21c50fd90bd8a0c080ea602d7c7c48052142aa9a7d`
 - ZIP contents: root-level manifest, popup/options HTML/CSS/JS, content script, and background worker
 
 ## Packaged companion service
 
 - Path: `artifacts/contextfill-companion-v0.2.0-beta.8.tgz`
-- Size: 890,582 bytes
-- Local SHA-256: `d0c77734ed7061dff1b75782681f9c35206edfb9a512d9aae4b5954d610e10ad`
+- Size: 890,658 bytes
+- Local SHA-256: `9432975a350816595b21f3d37fbc575b74f067c5eb05616033ce341d0beea8e4`
 - Package contents: executable bundled service, source map, installation guide, environment template, package metadata, and license

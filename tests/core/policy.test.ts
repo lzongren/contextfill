@@ -118,6 +118,13 @@ describe('deterministic trust policy', () => {
         { now },
       ),
     ).toMatchObject({ decision: 'block', reasonCode: 'stale' });
+    expect(
+      evaluateTrust(
+        { ...magicLink, expiresAt: new Date(now.getTime() - 1_000).toISOString() },
+        page,
+        { now },
+      ),
+    ).toMatchObject({ decision: 'block', reasonCode: 'expired' });
   });
 
   it('does not allow link navigation when sender evidence is missing or conflicts', () => {
