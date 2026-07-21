@@ -42,6 +42,6 @@
 - [x] Packaged and integrity-checked the beta.7 extension and companion, completed the clean-install companion smoke, scanned the extension bundle for secret names, and confirmed zero production audit vulnerabilities.
 - [x] Completed a user-observed real Gmail-to-Medium magic-link handoff: local no-fetch inspection, masked URL, aligned sender/page/destination decision, explicit click, and successful same-tab sign-in.
 - [x] Hardened real-provider compatibility after the live run: mixed code/link messages prefer verified handoff, long URLs are removed from bounded supporting evidence, and fallback codes embedded in subjects are masked.
-- [ ] Publish and verify the `v0.2.0-beta.7` public release artifacts and checksums.
+- [x] Published `v0.2.0-beta.7` as a public GitHub prerelease after the complete Linux release gate; downloaded all four public assets and verified both checksums and archive structures.
 - [ ] Complete a live Outlook connection when an Entra app registration is available; this is not required for the Gmail-backed release.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.
