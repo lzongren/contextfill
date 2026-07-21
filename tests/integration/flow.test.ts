@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   applyExplicitFill,
   buildConfirmationViewModel,
+  evaluateTrust,
+  extractDeterministic,
   extractInboxDeterministic,
   findContextField,
   findVerificationFields,
@@ -44,6 +46,35 @@ describe('fixture-to-page flow', () => {
     expect(applyExplicitFill(selected.policy, target, selected.candidate.value!)).toBe(true);
     expect(document.querySelector('input')?.value).toBe('481203');
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('masks a fallback OTP embedded in a verified-link email subject', () => {
+    const privateToken = 'm'.repeat(180);
+    const candidate = extractDeterministic({
+      id: 'medium-style-mixed-action',
+      source: 'gmail',
+      senderName: 'Medium',
+      senderAddress: 'noreply@medium.com',
+      subject: 'Your login code is 397926',
+      body: `Sign in to Medium: https://medium.com/m/callback/${privateToken}`,
+      receivedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 2 * 60 * 60_000).toISOString(),
+      serviceHint: 'Medium',
+    })!;
+    const page: PageContext = {
+      hostname: 'medium.com',
+      serviceHint: 'Medium',
+      simulated: false,
+      scenario: null,
+      fieldKind: 'split',
+      fieldCount: 6,
+    };
+    const policy = evaluateTrust(candidate, page, { now });
+    const view = buildConfirmationViewModel(candidate, policy, page, now);
+
+    expect(policy.decision).toBe('allow');
+    expect(view.subject).toBe('Your login code is ••••••');
+    expect(view.maskedValue).not.toContain(privateToken);
   });
 
   it('prevents page mutation for a lookalike block', () => {

@@ -51,6 +51,29 @@ describe('deterministic extraction', () => {
     });
   });
 
+  it('prefers a one-time sign-in link when the provider also supplies a code', () => {
+    const privateToken = 's'.repeat(450);
+    const url = `https://example.test/auth/${privateToken}`;
+    const candidate = extractDeterministic({
+      id: 'mixed-link-and-code',
+      source: 'gmail',
+      senderName: 'Example',
+      senderAddress: 'login@example.test',
+      subject: 'Sign in to Example',
+      body: `Enter 482913 or sign in to Example: ${url} Verify email`,
+      receivedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
+      serviceHint: 'Example',
+    });
+    expect(candidate).toMatchObject({
+      type: 'magic_link',
+      value: url,
+    });
+    expect(candidate?.supportingText[0]).toContain('[verified action link withheld]');
+    expect(candidate?.supportingText[0]).not.toContain(privateToken);
+    expect(candidate?.supportingText[0]?.length).toBeLessThanOrEqual(280);
+  });
+
   it('supports email confirmation but rejects high-risk recovery links', () => {
     const base = {
       source: 'gmail' as const,

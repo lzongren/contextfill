@@ -81,3 +81,7 @@ The popup records the initiating tab ID and exact URL at scan time. The navigati
 ## D-020: Reference transfer is narrow and field-driven
 
 Generic numbers and order IDs create unacceptable false positives. Deterministic reference extraction is limited to explicit booking, reservation, application, support, case, or ticket-reference language; the page must expose a correspondingly labeled field. The same domain, service, sender, replay, and user-confirmation policy applies, with a documented 24-hour freshness window and no automatic submission.
+
+## D-021: Mixed login messages prefer the verified link without duplicating secrets
+
+Real providers may send a fallback OTP and a one-time link in the same message. When both are present, ContextFill selects the verified-link action; OTP-only messages retain their existing behavior. Supporting excerpts replace the exact URL with a fixed withheld marker and remain schema-bounded, while confirmation subjects mask embedded fallback codes. Gmail's normal bounded query intentionally does not opt into Spam or Trash; a legitimate message must be moved to the inbox before ContextFill will act on it.

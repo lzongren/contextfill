@@ -45,7 +45,7 @@ const redirectParameterNames = new Set([
 ]);
 const redirectPathPattern = /\/(?:click|out|redir(?:ect)?|track|url)(?:\/|$)/i;
 const supportedActionLanguage =
-  /\b(magic link|sign[- ]?in link|login link|email confirmation|confirm (?:your )?email|verify (?:your )?email|activate (?:your )?account|continue (?:to )?(?:sign[- ]?in|login))\b/i;
+  /\b(magic link|secure (?:access|sign[- ]?in|login) link|sign[- ]?in link|login link|email confirmation|confirm (?:your )?email|verify (?:your )?email|activate (?:your )?account|continue (?:to )?(?:sign[- ]?in|login)|(?:sign[- ]?in|log ?in) (?:to|with) [a-z0-9][a-z0-9.'’_-]{1,40})\b/i;
 const highRiskActionLanguage =
   /\b(password reset|reset (?:your )?password|account recovery|recover (?:your )?account|payment authorization|approve (?:a )?payment|wire transfer|sign (?:this |the )?(?:document|agreement)|e-?signature)\b/i;
 

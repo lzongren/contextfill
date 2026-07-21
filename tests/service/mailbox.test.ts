@@ -126,6 +126,8 @@ describe('mailbox OAuth and provider adapters', () => {
       if (url.includes('/users/me/messages?')) {
         const query = new URL(url).searchParams.get('q');
         expect(query).toContain('"magic link"');
+        expect(query).toContain('"secure access link"');
+        expect(query).toContain('"sign in to"');
         expect(query).toContain('"booking reference"');
         return Response.json({ messages: [{ id: 'gmail-message-1' }] });
       }

@@ -26,6 +26,23 @@ export function maskCandidateValue(value: string | null): string {
   return `${'•'.repeat(value.length - 2)}${value.slice(-2)}`;
 }
 
+export function maskTemporarySecretsInText(
+  text: string,
+  candidateValue: string | null = null,
+): string {
+  let masked = text;
+  if (candidateValue && masked.includes(candidateValue)) {
+    const replacement = /^https?:\/\//i.test(candidateValue)
+      ? '[verified action link withheld]'
+      : '•'.repeat(Math.min(candidateValue.length, 10));
+    masked = masked.split(candidateValue).join(replacement);
+  }
+  return masked.replace(
+    /\b((?:(?:verification|security|sign[- ]?in|login|temporary|authentication|auth|access|confirmation|one[- ]?time)\s+)?(?:code|passcode)\s*(?:is\s+|:\s*)?)([A-Z0-9]{4,10})\b/gi,
+    (_match, label: string, secret: string) => `${label}${'•'.repeat(secret.length)}`,
+  );
+}
+
 export function formatMessageAge(receivedAt: string, now = new Date()): string {
   const minutes = Math.max(
     0,
@@ -59,7 +76,7 @@ export function buildConfirmationViewModel(
     sender: candidate.senderAddress
       ? `${candidate.senderName ?? 'Unknown sender'} <${candidate.senderAddress}>`
       : (candidate.senderName ?? 'Unknown sender'),
-    subject: candidate.subject,
+    subject: maskTemporarySecretsInText(candidate.subject, candidate.value),
     age: formatMessageAge(candidate.receivedAt, now),
     claimedService: candidate.claimedService ?? 'Not identified',
     activeDomain: page.hostname,

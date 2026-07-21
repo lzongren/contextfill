@@ -11,7 +11,7 @@ const verificationLanguage =
   /\b(verification|verify|one[- ]time|security code|sign[- ]?in code|login code|temporary code|authentication code|auth code|access code|confirmation code|passcode|two[- ]factor|2fa|otp)\b/i;
 const unrelatedLanguage = /\b(order|receipt|invoice|tracking|street|lane|customer care|phone)\b/i;
 const magicLinkLanguage =
-  /\b(magic link|sign[- ]?in link|login link|email confirmation|confirm (?:your )?email|verify (?:your )?email|activate (?:your )?account|continue (?:to )?(?:sign[- ]?in|login))\b/i;
+  /\b(magic link|secure (?:access|sign[- ]?in|login) link|sign[- ]?in link|login link|email confirmation|confirm (?:your )?email|verify (?:your )?email|activate (?:your )?account|continue (?:to )?(?:sign[- ]?in|login)|(?:sign[- ]?in|log ?in) (?:to|with) [a-z0-9][a-z0-9.'’_-]{1,40})\b/i;
 const referenceLanguage =
   /\b(booking|reservation|application|support|case|ticket)\s+(?:reference|confirmation|number|id)\b/i;
 const referenceAfterLanguage =
@@ -87,10 +87,22 @@ function extractReference(text: string): string | null {
 }
 
 function excerptAround(text: string, needle: string | null): string[] {
-  if (!needle) return [text.slice(0, 180)];
+  const maxLength = 280;
+  if (!needle) return [text.slice(0, maxLength)];
   const index = text.toUpperCase().indexOf(needle.toUpperCase());
+  if (index < 0) return [text.slice(0, maxLength)];
+  if (/^https?:\/\//i.test(needle)) {
+    const before = text.slice(Math.max(0, index - 90), index);
+    const after = text.slice(index + needle.length, index + needle.length + 160);
+    return [`${before}[verified action link withheld]${after}`.trim().slice(0, maxLength)];
+  }
   const start = Math.max(0, index - 55);
-  return [text.slice(start, Math.min(text.length, index + needle.length + 90)).trim()];
+  return [
+    text
+      .slice(start, Math.min(text.length, index + needle.length + 90))
+      .trim()
+      .slice(0, maxLength),
+  ];
 }
 
 export function isModelEligibleMessage(message: SyntheticMessage): boolean {
@@ -116,13 +128,16 @@ export function extractDeterministic(messageInput: SyntheticMessage): Verificati
   if (!code && !magicLink && !reference) return null;
   if (hasUnrelatedLanguage && !hasVerificationLanguage && !magicLink && !reference) return null;
 
-  const type = code ? 'otp' : magicLink ? 'magic_link' : 'reference';
-  const confidence = code ? (codeAfterLanguage.test(text) ? 0.97 : 0.78) : magicLink ? 0.9 : 0.94;
+  // Providers such as Substack include both an OTP and a one-time action link in the same
+  // message. Preserve OTP-only behavior, but prefer the verified-link path when both exist.
+  const type = magicLink ? 'magic_link' : code ? 'otp' : 'reference';
+  const selectedValue = magicLink ?? code ?? reference;
+  const confidence = magicLink ? 0.9 : code ? (codeAfterLanguage.test(text) ? 0.97 : 0.78) : 0.94;
   return verificationCandidateSchema.parse({
     id: `candidate:${message.id}`,
     messageId: message.id,
     type,
-    value: code ?? magicLink ?? reference,
+    value: selectedValue,
     claimedService: inferService(message),
     referencedDomains: findDomains(message),
     senderName: message.senderName,
@@ -131,7 +146,7 @@ export function extractDeterministic(messageInput: SyntheticMessage): Verificati
     receivedAt: message.receivedAt,
     expiresAt: message.expiresAt,
     confidence,
-    supportingText: excerptAround(message.body, code ?? magicLink ?? reference),
+    supportingText: excerptAround(message.body, selectedValue),
     extractionMethod: 'deterministic',
   });
 }

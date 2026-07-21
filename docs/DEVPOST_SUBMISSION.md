@@ -52,7 +52,7 @@ Vitest covers unit and integration behavior. Playwright loads the packaged exten
 
 The primary Codex session started from an empty repository and drove architecture, implementation, real Gmail integration, testing, debugging, security review, visual QA, packaging, and submission preparation. Codex implemented the extension, demo, core, local service, and documentation, then iterated on failures found by real browser and real-site tests.
 
-Concrete examples: real Vialto testing exposed a missing per-origin permission flow and a nonsemantic six-box code widget; both were corrected and retested. Product review also challenged an OTP-only story, so the architecture was extended into Verified Magic-Link Handoff and Trusted Reference Transfer while keeping the deterministic authorization boundary intact.
+Concrete examples: real Vialto testing exposed a missing per-origin permission flow and a nonsemantic six-box code widget; both were corrected and retested. Product review also challenged an OTP-only story, so the architecture was extended into Verified Magic-Link Handoff and Trusted Reference Transfer while keeping the deterministic authorization boundary intact. A real Gmail-to-Medium run then exposed mixed OTP/link precedence, long-token evidence bounds, and a fallback code embedded in the subject; all three were fixed before release, and the explicit same-tab magic-link sign-in succeeded.
 
 Before submission, add the real `/feedback` Session ID and confirm the session's actual model metadata. Do not infer either.
 
@@ -84,6 +84,7 @@ When the service, key, API, timeout, JSON, schema, or evidence validation fails,
 - Strict GPT-5.6 integration with source-evidence validation and clean fallback.
 - Least-privilege page access and loopback-only model service.
 - Comprehensive unit/integration, installed-Chrome, and packaged-extension acceptance coverage, including inert link confirmation and explicit same-tab handoff.
+- A completed real Gmail-to-Medium flow with local no-fetch inspection, permanently masked URL details, explicit approval, and successful same-tab sign-in.
 - Complete judge, threat, demo, screenshot, collaboration, and release documentation.
 
 ## What was learned
@@ -98,7 +99,7 @@ Browser behavior also reinforced that “obvious” field heuristics conflict in
 - Add authenticated, rate-limited local transport.
 - Improve Unicode script and brand-risk analysis without overstating coverage.
 - Support open shadow roots and carefully scoped iframe workflows.
-- Complete live user-owned Gmail and Outlook conformance runs and provider review before general mailbox distribution.
+- Complete a live user-owned Outlook conformance run and provider reviews before general mailbox distribution; the Gmail OTP and magic-link paths are validated.
 - Expand safe handoff only where the destination and page can be verified locally; keep recovery, payment, and signing actions out of scope.
 
 ## Judge testing

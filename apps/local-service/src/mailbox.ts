@@ -320,7 +320,7 @@ function looksTemporaryActionText(text: string): boolean {
       text,
     ) && /\b[A-Z0-9]{4,10}\b/i.test(text);
   const hasMagicLink =
-    /\b(magic link|sign[- ]?in link|login link|confirm (?:your )?email|verify (?:your )?email|email confirmation|activate (?:your )?account)\b/i.test(
+    /\b(magic link|secure (?:access|sign[- ]?in|login) link|sign[- ]?in link|login link|confirm (?:your )?email|verify (?:your )?email|email confirmation|activate (?:your )?account|(?:sign[- ]?in|log ?in) (?:to|with) [a-z0-9][a-z0-9.'’_-]{1,40})\b/i.test(
       text,
     ) && /https:\/\//i.test(text);
   const hasReference =
@@ -697,7 +697,7 @@ export class MailboxManager implements MailboxManagerLike {
     listUrl.searchParams.set('maxResults', '20');
     listUrl.searchParams.set(
       'q',
-      'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "sign-in link" "login link" "confirm your email" "verify your email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
+      'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
     );
     const listResponse = await this.providerFetch('gmail', listUrl.toString());
     const list = (await listResponse.json()) as { messages?: Array<{ id?: unknown }> };
