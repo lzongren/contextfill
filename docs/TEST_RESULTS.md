@@ -2,20 +2,20 @@
 
 Release candidate checked on 2026-07-21 in the local macOS workspace.
 
-| Check                         | Command                                                      | Result                                                |
-| ----------------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
-| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 105 tests passed  |
-| Unit and integration          | `npm test`                                                   | 19 files, 105 tests passed                            |
-| Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built          |
-| Packaged MV3 acceptance       | `npm run test:extension`                                     | 8 Chromium tests passed                               |
-| Judge-browser acceptance      | `npm run test:browser`                                       | 7 Chromium tests passed                               |
-| Full release gate             | `npm run verify`                                             | Passed on the final beta.8 candidate                  |
-| Extension and companion build | `npm run package`                                            | Both beta.8 artifacts produced                        |
-| Companion clean install       | `npm run test:package`                                       | Setup, doctor, startup, and health smoke passed       |
-| Production dependency audit   | `npm audit --omit=dev --audit-level=moderate`                | 0 vulnerabilities                                     |
-| Extension archive integrity   | `unzip -t artifacts/contextfill-extension-v0.2.0-beta.8.zip` | No errors; options and Auto-Continue bundles included |
-| Extension secret-name scan    | `rg` over `dist/extension`                                   | No API-key/OAuth-secret names found                   |
-| Public GitHub prerelease      | Release workflow and downloaded `v0.2.0-beta.8` assets       | Pending tag publication and independent verification  |
+| Check                         | Command                                                      | Result                                                 |
+| ----------------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
+| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 105 tests passed   |
+| Unit and integration          | `npm test`                                                   | 19 files, 105 tests passed                             |
+| Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built           |
+| Packaged MV3 acceptance       | `npm run test:extension`                                     | 8 Chromium tests passed                                |
+| Judge-browser acceptance      | `npm run test:browser`                                       | 7 Chromium tests passed                                |
+| Full release gate             | `npm run verify`                                             | Passed on the final beta.8 candidate                   |
+| Extension and companion build | `npm run package`                                            | Both beta.8 artifacts produced                         |
+| Companion clean install       | `npm run test:package`                                       | Setup, doctor, startup, and health smoke passed        |
+| Production dependency audit   | `npm audit --omit=dev --audit-level=moderate`                | 0 vulnerabilities                                      |
+| Extension archive integrity   | `unzip -t artifacts/contextfill-extension-v0.2.0-beta.8.zip` | No errors; options and Auto-Continue bundles included  |
+| Extension secret-name scan    | `rg` over `dist/extension`                                   | No API-key/OAuth-secret names found                    |
+| Public GitHub prerelease      | Release workflow and downloaded `v0.2.0-beta.8` assets       | Passed; public prerelease and all four assets verified |
 
 The packaged-extension acceptance suite proves that Assisted mode discovers and verifies an OTP without the popup but waits for in-page confirmation; a dynamically inserted SPA dialog triggers the same path; Auto-Continue fills an OTP after a visible countdown without clicking Submit and suppresses field animation under reduced-motion; an aligned magic link opens only the captured tab while a fresh lookalike blocks before navigation; cancellation prevents navigation; exact-origin revocation prevents future scanning; and privacy-safe history contains no candidate value. Separate packaged tests cover extension boot and the legacy explicit magic-link/reference path.
 
@@ -23,13 +23,13 @@ The installed-Chrome suite covers aligned magic-link context, no navigation duri
 
 The automated release gate uses injected provider/model responses and does not make paid OpenAI or external mailbox calls. Separately, a user-owned Gmail OAuth connection was completed with read-only scope and OS-keychain refresh persistence, and the connector retrieved bounded recent mail. In ChatGPT Atlas, the user then enabled Auto-Continue once for each exact site and completed two popup-free real-mail acceptance flows: Medium displayed the cancellable three-second overlay and opened the verified magic-login link in the same tab, while Substack displayed the same countdown and filled all six split OTP fields without ContextFill clicking Submit. Substack continued after the final digit according to its own page behavior. The user also observed the competing-message safeguard fail closed when multiple fresh Medium emails were eligible, then completed a clean retry after the ambiguity window. No acceptance record or public media exposes a real token, fallback code, address, or personal message.
 
-## Current public release (beta.7)
+## Current public release (beta.8)
 
-- URL: [ContextFill v0.2.0-beta.7](https://github.com/lzongren/contextfill/releases/tag/v0.2.0-beta.7)
-- Release state: public prerelease, built from `e503c6d7e2384ceaf35bb4fd38ea6db963bb57c4`
-- Extension SHA-256: `642861199b27b8043f3e5eedf8da84bba88b13e1ac5488f90f32bc6f432136d4`
-- Companion SHA-256: `a11848e3cd7a0a5896beb51e84550bc4db722e5654f8529d12908780537d6912`
-- Download verification: both published `.sha256` files passed; the ZIP and TGZ structures were read successfully.
+- URL: [ContextFill v0.2.0-beta.8](https://github.com/lzongren/contextfill/releases/tag/v0.2.0-beta.8)
+- Release state: public prerelease, built from merged `main` commit `8f1025007ef153b8b66c7449c4026201f73420f6`
+- Extension SHA-256: `b60e0bfcb4421a75acee3db713477ae4ae4d281a927cb653554d1d72a866fb66`
+- Companion SHA-256: `d70a614b49bafb997de8bae5050ce7a09cc4c08296708afb2366c808f90241d9`
+- Download verification: all four published assets were downloaded independently; both `.sha256` files passed, both archive structures were read successfully, and the embedded versions matched beta.8.
 
 ## Packaged extension
 
