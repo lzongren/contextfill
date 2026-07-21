@@ -39,15 +39,15 @@ The automated release gate uses injected provider/model responses and makes no p
 ### Packaged extension
 
 - Path: `artifacts/contextfill-extension-v0.2.0-beta.8.zip`
-- Size: 530,745 bytes
-- Local SHA-256: `95af32d79fef7794a6ca386eb6999416ff7bf0359dd4a7399263012590789cfe`
+- Size: 531,322 bytes
+- Local SHA-256: `d192fc3e6f37f3c7c17cb1c1685c394b76fc99c510d4085cd46d555200e76e32`
 - ZIP contents: root-level manifest, popup/options HTML/CSS/JS, content/background workers, and separate Capsule/easyJet content bundles
 
 ### Packaged companion service
 
 - Path: `artifacts/contextfill-companion-v0.2.0-beta.8.tgz`
-- Size: 897,910 bytes
-- Local SHA-256: `1612b80af4250acba002ed997c11b707d35ac038d5d339d34d38da1079095d54`
+- Size: 897,845 bytes
+- Local SHA-256: `ff95da63d70669d01c25dce66daea7b0bdac9da81254109be6e13359c55efd52`
 - Package contents: executable bundled service, source map, installation guide, environment template, package metadata, and license
 
 These integration artifacts are local verification outputs only. The Capsule/easyJet work creates no competing tag or release; PR #17 is the review and integration boundary.
