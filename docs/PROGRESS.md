@@ -1,5 +1,32 @@
 # Progress
 
+## 2026-07-21
+
+- [x] Added an explicit Gmail → Alaska Airlines Capsule path for the exact official Manage Reservation route, using a 13-month sender/subject-bounded mailbox query instead of the generic 15-minute code workflow.
+- [x] Added strict Alaska confirmation validation and deterministic extraction from a labeled confirmation code plus exactly one two-part name in the `Traveler(s)` section; greetings, ambiguous travelers, spoofed senders, and unrelated messages fail closed.
+- [x] Added Alaska field mapping for `Passenger's last name` and `Confirmation code or e-ticket #`, with action-time policy/DOM revalidation, atomic two-field transfer, no-submit receipt, replay marking, and Undo.
+- [x] Added unit, service, exact-origin, and packaged-extension regressions proving an unrelated Tennis Express candidate is not offered and the Alaska form is never submitted.
+- [x] Passed the beta.9 release gate (134 unit/integration, 10 default packaged, 12 installed-Chrome), a separate private Gmail → Alaska conformance run, three-repeat packaged stability check, companion clean-install smoke, archive/permission/secret-name inspection, and a zero-vulnerability production audit.
+- [x] Produced local beta.9 extension and companion artifacts without merging, publishing, or adding standing production access to either airline domain.
+- [x] Corrected the live easyJet greeting-name false positive: `Hi, Zongren` is no longer treated as a passenger surname when the confirmation does not state one.
+- [x] Added a masked, user-selected easyJet reference-only fallback that verifies the Apple relay/domain/origin and historical lookup window, fills only the booking reference, leaves surname and consent manual, and never submits.
+- [x] Added the isolated private Gmail → easyJet path: purpose-bounded historical confirmation retrieval, explicit labeled-surname extraction, strict Apple Hide My Email relay evidence, and masked user choice across multiple bookings.
+- [x] Added exact-route `https://www.easyjet.com/en?accntmdl=2` activation with runtime-only production permission, action-time policy/DOM revalidation, atomic transfer, replay-before-Undo, and no submit.
+- [x] Inspected the live easyJet Find Booking DOM: visible surname, booking-reference, and consent-checkbox controls share one form; the mapper selects only the two text inputs.
+- [x] Repeated the private packaged conformance run after the live greeting-name mismatch. It required masked booking selection, filled only the evidenced booking-reference field, left surname and consent untouched, recorded zero submits, and logged no raw values.
+
+- [x] Implemented Verified Context Capsules as the airline-check-in hero flow: exactly one booking reference and passenger surname, a compact Message → trust checks → capsule → destination trace, explicit two-field transfer, truthful no-submit receipt, and Undo.
+- [x] Added strict Zod schemas and deterministic/model extraction boundaries; GPT-5.6 can return source-grounded facts only and cannot authorize or choose fields.
+- [x] Added deterministic sender/service/origin/freshness/expiry/replay policy with controlled lookalike blocking and action-time revalidation.
+- [x] Added conservative two-field mapping that rejects sensitive, hidden, disabled, zero-size, offscreen, ambiguous, nonempty, overlong, and split-container targets.
+- [x] Made execution atomic through post-set verification and reverse rollback; successful transfer marks replay before Undo, and Undo never makes the capsule reusable.
+- [x] Added masked Shadow DOM presentation with keyboard/Escape support, reduced-motion behavior, and no raw booking reference or surname in the overlay DOM.
+- [x] Added aligned, lookalike, decoy, conflict, stale, nonempty, and reduced-motion judge scenarios plus packaged-extension activation limited to exact judge/test origins and allowlisted metadata.
+- [x] Added focused schema, extraction, policy, mapping, rollback, masking, activation, service, packaged-extension, and installed-Chrome regressions.
+- [x] Passed the final combined release gate (128 unit/integration, 9 default packaged-extension, 1 private Gmail/easyJet, and 12 installed-Chrome tests), companion clean-install smoke, archive integrity and secret-name scans, and a zero-vulnerability production audit.
+- [x] Rebased the Capsule integration onto latest beta.8 `main` commit `e98473f4`, repeated the complete release/package/audit gates, and retained the independently reviewed 1280×720 success, Undo, Escape, and lookalike experiences.
+- [x] Opened focused draft PR #17 without merging or publishing a competing release and completed its beta.8 rebase locally for the final review push.
+
 ## 2026-07-20
 
 - [x] Read the full Build Week specification.

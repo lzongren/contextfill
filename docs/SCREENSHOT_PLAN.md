@@ -1,57 +1,57 @@
 # Screenshot plan
 
-Use a clean Chrome profile, crop out unrelated tabs/profile details, and never show `.env`, terminal environment values, personal mail, API dashboards, or keys.
+Use a clean Chrome profile, default zoom, synthetic fixtures only, and crop unrelated tabs/profile details. Never show `.env`, terminal values, personal mail, provider accounts, keys, or real tokens.
 
-## 1. Hero — visible Auto-Continue countdown
+## 1. Verified Context Capsule trust trace
 
-- Page: `?scenario=magic-link` with Auto-Continue already enabled for the judge origin.
-- Extension state: popup closed; in-page card at **Opening in 3…** with verified destination and **Cancel auto action** visible.
-- Must show: simulated page identity, visible progress, Auto-Continue mode badge, masked destination hostname only, privacy boundary, and the unchanged page behind it.
-- This is the strongest hero image because it communicates popup-free continuity, trust, and user control in one frame.
-- Use only the synthetic fixture; confirm no token, personal address, or mailbox UI appears.
+- Page: `?scenario=capsule`, before transfer, at 1280×720.
+- Show the simulated `checkin.aurelia-air.test` banner, all four stages, five aligned checks, two masked fact chips, unique two-field map, and **Transfer 2 verified facts** beside the page form.
+- Confirm `AU-47K2` and `Rivera` are absent from the Capsule DOM before capture.
 
-## 2. Blocked magic-link lookalike
+## 2. Atomic receipt and Undo
 
-- Page: `?scenario=magic-link-lookalike` with popup closed.
-- Extension state: in-page **Auto-Continue stopped**.
-- Must show: simulated `login.cedarn0tes.test`, blocked/mismatch explanation, and no action capable of navigation.
-- Pair this with the hero to show that automation preserves the deterministic security boundary.
+- Capture immediately after approval: exactly two highlighted synthetic fields, **2 verified facts transferred. Form not submitted.**, unchanged Remember control, and **Undo entire handoff**.
+- Follow with both fields empty and the restoration receipt after Undo.
+- Never substitute real booking or passenger data.
 
-## 3. Trusted-sites and privacy-safe activity
+## 3. Blocked Capsule lookalike
 
-- Page: extension settings after one synthetic OTP fill and one synthetic magic-link open.
-- Must show: exact origin including protocol/port, Auto-Continue badge, Revoke, activity outcome/time, seven-day privacy explanation, and Clear activity.
-- Confirm no code, link token, subject, sender address, page path, or personal hostname is visible.
+- Page: `?scenario=capsule-lookalike`.
+- Show simulated `checkin.aureliaair.test`, **Transfer blocked**, registrable-domain explanation, faded downstream stages, empty fields, and no Transfer/override.
+- Pair with image 1 to communicate value and boundary in under 30 seconds.
 
-## 4. Manual verified magic-link evidence card
+## 4. Auto-Continue countdown and cancellation
 
-- Page: `?scenario=magic-link`.
-- Extension state: Allowed, one-time path permanently masked.
-- Must show: sender, subject, message age, Cedar Notes, requesting site and destination `login.cedarnotes.test`, deterministic reason, and **Open verified link in this tab**.
-- Composition: judge lab's simulated-domain banner behind or beside the popup so the relationship is immediately legible.
-- Confirm `sample-token` is absent before capturing.
+- Page: configured `?scenario=legitimate-single` or `?scenario=magic-link`.
+- Show the exact simulated origin behind the closed-shadow card, masked action, aligned trust reason, visible three-second countdown, and **Cancel auto action**.
+- Capture a second frame after cancellation with the page unchanged.
 
-## 5. Trusted reference transfer
+## 5. Auto-Continue success and lookalike block
 
-- Page: `?scenario=reference`, first with the allowed popup and then after **Fill reference**.
-- Must show: explicit booking-reference field, unchanged Remember checkbox, and **The form has not been submitted.**
-- This image proves the trust engine generalizes beyond links and OTP.
+- Success: show the privacy-safe receipt and the page’s zero extension-submit state; for a link, show only masked destination host before action.
+- Block: use a fresh unused `?scenario=magic-link-lookalike` session so policy records `lookalike`, not replay. Show no action/navigation.
 
-## 6. Optional architecture diagram
+## 6. Trusted sites and privacy-safe activity
 
-- Use the Mermaid architecture diagram from `README.md` or redraw it with the same factual boundaries.
-- Emphasize: wait-state detection → message facts → deterministic policy → visible Assisted/Auto gate → execution-time revalidation → same-tab action; never prefetch or extension submission.
+- Show exact protocol/host/port, mode, Revoke control, and bounded outcome/reason/time rows.
+- Confirm no code, link token, subject, sender, body, or page path appears.
 
-## 7. Optional GPT/fallback indicator
+## 7. Optional architecture or GPT evidence
 
-- Capture one legitimate card with **Deterministic extraction · policy decided locally**.
-- If a live key is safely configured off-screen, capture another with **GPT-5.6 extracted message facts · deterministic policy decided**.
-- Never include the service terminal, `.env`, request headers, or API account page.
+- Architecture: message → bounded extraction → deterministic policy → Capsule field map or configured action → visible control → atomic mutation/same-tab navigation.
+- GPT: show the extraction label only; never capture service terminal, `.env`, request headers, or API account.
+
+## 20–30 second Capsule segment
+
+1. Hold the masked allowed trace for 4 seconds.
+2. Approve; hold the no-submit receipt for 4 seconds.
+3. Undo; show restored fields for 3 seconds.
+4. Switch to lookalike; hold the broken chain with no action for 5 seconds.
+5. Close: “The model extracts facts. Deterministic code decides whether they belong on this page.”
 
 ## Recording hygiene
 
 - Close personal tabs and notifications.
-- Use synthetic fixtures only.
-- Keep the browser zoom and popup size at defaults.
-- Record the popup-free countdown and block paths first in case later material must be cut.
-- Verify the final video remains under three minutes before uploading publicly to YouTube.
+- Record Capsule allow/Undo/block and Auto countdown/cancel first.
+- Do not use real mailbox acceptance footage publicly.
+- Verify the final video remains under three minutes.

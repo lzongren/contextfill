@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ContextFill",
-  "version": "0.2.0.8",
-  "version_name": "0.2.0-beta.8",
+  "version": "0.2.0.9",
+  "version_name": "0.2.0-beta.9",
   "description": "Automatically continues verified email actions with visible, cancellable local trust checks.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["http://127.0.0.1:4318/*", "http://127.0.0.1:4173/*"],
@@ -15,5 +15,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["http://127.0.0.1/*"],
+      "js": ["capsule-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "minimum_chrome_version": "114"
 }

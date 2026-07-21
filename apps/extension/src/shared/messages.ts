@@ -1,5 +1,10 @@
-import type { PageContext } from '../../../../packages/core/src/index.js';
+import type {
+  ContextCapsule,
+  MailboxMessage,
+  PageContext,
+} from '../../../../packages/core/src/index.js';
 import type { ActivityRecord, AutomationMode, AutomationSiteRule } from '../automation-settings.js';
+import type { LiveAirlineId } from '../live-airline-policy.js';
 
 export type AutomaticPageSignal = {
   intents: Array<'otp' | 'magic_link'>;
@@ -25,9 +30,21 @@ export type ContentRequest =
       authorized: true;
     }
   | { type: 'SHOW_AUTOMATION_OVERLAY'; view: AutomationOverlayView }
-  | { type: 'HIDE_AUTOMATION_OVERLAY' };
+  | { type: 'HIDE_AUTOMATION_OVERLAY' }
+  | {
+      type: 'SHOW_AIRLINE_CAPSULE';
+      airline: LiveAirlineId;
+      capsule: ContextCapsule;
+      message: MailboxMessage;
+    };
 export type ContentResponse =
-  | { ok: true; page?: PageContext; automation?: AutomaticPageSignal; filled?: true }
+  | {
+      ok: true;
+      page?: PageContext;
+      automation?: AutomaticPageSignal;
+      filled?: true;
+      capsuleShown?: true;
+    }
   | { ok: false; error: string };
 
 export type BackgroundRequest =

@@ -6,18 +6,18 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 ## Assets
 
-- One-time link tokens, verification codes, and trusted references.
+- One-time link tokens, verification codes, trusted references, and the facts inside a short-lived context capsule.
 - The relationship between a message, sender, service, destination, and initiating site.
 - The user's Manual, Assisted, or Auto-Continue choice for an exact site and ability to observe/cancel an action.
 - The optional OpenAI API key.
 - Gmail and Microsoft OAuth access and refresh tokens.
 - The per-install loopback pairing capability.
-- Integrity of the deterministic policy and replay state.
+- Integrity of the deterministic policy, field map, atomic transfer, rollback receipt, and replay state.
 - Privacy of inbox and browsing context.
 
 ## Trust boundaries
 
-1. **Webpage → isolated content script:** the page DOM, labels, metadata, and fields are untrusted. Only localhost may provide a simulated hostname.
+1. **Webpage → isolated content script:** the page DOM, labels, metadata, layout, fields, event listeners, scenario attributes, and simulated host/service metadata are untrusted. Capsule fixture activation additionally requires an exact allowlisted origin and scenario/host/service tuple.
 2. **Mailbox provider, imported file, or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, attachments, and any instructions in a message are untrusted data.
 3. **Extension UI/background → content script or initiating tab:** Manual requires a popup action. Assisted requires an in-page action. Auto-Continue requires a stored exact-origin grant, a visible cancellable countdown, and fresh deterministic revalidation bound to the exact tab URL before any value or navigation is sent.
 4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require a paired capability and matching extension installation ID; browser `Origin` is cross-checked when present.
@@ -25,9 +25,49 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 6. **Loopback service → Gmail/Microsoft APIs:** only bounded recent-message queries are made with delegated read-only scopes.
 7. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
 8. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
-9. **Policy → mutation/navigation:** automatic and Assisted actions require `allow`. Manual link navigation also requires `allow`; a manually acknowledged eligible warning may fill a value, but link warnings and all block decisions cannot be overridden.
+9. **Policy and field plan → mutation/navigation:** action-time policy, replay, exact-tab context, and configured automation mode are rechecked; capsule actions also regenerate the complete field plan against the current DOM. Automatic, Assisted, link-navigation, and capsule actions require `allow`. A manually acknowledged eligible warning may fill a legacy single value, but link warnings and all block decisions cannot be overridden.
 
 ## Threats and mitigations
+
+### Multi-field capsule leaks or over-collects message data
+
+**Threat:** A capsule collects extra passenger or itinerary details, renders raw facts in the overlay, or allows one fact to be transferred without the other.
+
+**Mitigations:** The capsule schema is strict and closed: one travel-check-in intent, exactly two unique keys (`booking_reference` and `passenger_surname`), bounded source-grounded values, and no unknown fields. Message bodies and model output are untrusted. The presentation layer masks both values everywhere, including occurrences inside the subject. Transfer is all-or-nothing and the receipt reports only the count and target labels. No capsule fact is copied, logged, put in analytics, or persisted.
+
+**Residual risk:** The two permitted facts are still sensitive while present in extension/page memory and become visible in the destination fields after the user explicitly transfers them. A hostile page or local browser debugging session can inspect its own field values.
+
+### Field confusion, malicious labels, and decoy controls
+
+**Threat:** A hostile page labels a password, payment, hidden, offscreen, zero-size, disabled, ambiguous, or unrelated input as the booking reference or surname and tricks ContextFill into targeting it.
+
+**Mitigations:** Mapping is deterministic and separate from extraction and policy. It rejects password and sensitive/payment/account signals, hidden/disabled/read-only controls, zero-size or offscreen geometry, ambiguous same-key matches, nonempty targets, overlong constraints, and targets that do not share one form or explicit form-like container. Only the two exact key-specific field plans are accepted. The plan is regenerated at action time before mutation. Unit and browser fixtures cover hidden decoys, zero-size controls, split forms, ambiguity, and sensitive labels.
+
+**Residual risk:** DOM semantics and layout are page-controlled. A malicious page can change labels or geometry after inspection; action-time revalidation narrows but cannot eliminate every time-of-check/time-of-use race inside hostile page code.
+
+### Partial capsule mutation or framework rewrite
+
+**Threat:** The first field accepts its value but an input listener or framework rejects, rewrites, removes, or redirects the second assignment, leaving a misleading partial transfer.
+
+**Mitigations:** Execution revalidates the entire plan, snapshots both previous values, uses the native value setter, dispatches only `input` and `change`, and verifies the post-set value after each mutation. Any mismatch triggers reverse-order rollback of every prior mutation and no success receipt. A successful transfer marks replay before the receipt is exposed. Undo restores only values that still equal the transferred facts, so it does not overwrite later user edits.
+
+**Residual risk:** Page-owned listeners can cause side effects in response to input/change events even when values are rolled back. ContextFill cannot make an arbitrary hostile document transactionally isolated.
+
+### Capsule overwrite, persistence, expiry, or replay
+
+**Threat:** ContextFill overwrites user input, retains capsule facts, transfers an expired capsule, or lets Undo make a used capsule reusable.
+
+**Mitigations:** Both target fields must be empty before approval and again at execution. Capsule facts live in short-lived variables, expire after 90 seconds, and are never put in browser storage. Action-time policy checks current time and background replay state. Successful execution records only the stable capsule ID; Undo restores prior values but deliberately preserves replay. Dismissal, expiry, and failure clear the presentation state without submission.
+
+**Residual risk:** MV3 in-memory replay can reset after browser or extension restart, and destination fields retain transferred facts until the page or user clears them.
+
+### Arbitrary loopback page impersonates a trusted fixture
+
+**Threat:** Because the manifest can inject a content script on loopback pages, an unrelated local page supplies `contextfill-scenario`, simulated host, and service metadata to mount a trusted-looking capsule overlay.
+
+**Mitigations:** Content-script activation uses a closed code-level allowlist: only the root path on exact origins `http://127.0.0.1:4173` and `http://127.0.0.1:4179`, known capsule scenario names, and each scenario's exact simulated host/service tuple are accepted. Scheme, hostname aliases, ports, other paths, foreign metadata, and arbitrary `capsule*` strings fail closed. Unit and packaged-browser tests include negative activation assertions.
+
+**Residual risk:** The local judge server and built extension remain trusted development artifacts. An attacker who replaces those files or controls the allowlisted port can imitate the fixture; code signing and production-origin deployment are outside this prototype.
 
 ### Malicious webpage requests an unrelated code
 
@@ -97,9 +137,9 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A local attacker steals a refresh token, a connector requests write access, or an API response causes broad mailbox disclosure.
 
-**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. The non-secret readiness doctor derives callbacks and scopes from runtime configuration, rejects service/callback port drift, and checks private `.env` permissions before consent. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail explicitly excludes Spam and Trash while searching one day of temporary-action phrases and retrieves at most 12 bodies; Outlook queries only the Inbox and filters 25 recent summaries to at most 10 code, magic-link, or reference-like results. HTML-only message normalization preserves HTTPS anchor destinations as inert text without loading them. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
+**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. The non-secret readiness doctor derives callbacks and scopes from runtime configuration, rejects service/callback port drift, and checks private `.env` permissions before consent. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail normally excludes Spam and Trash while searching one day of temporary-action phrases and retrieves at most 12 bodies; Outlook queries only the Inbox and filters 25 recent summaries to at most 10 code, magic-link, or reference-like results. Live airline booking lookup is the bounded historical exception: it activates only on an exact allowlisted route and chooses an airline-specific query, message age, sender, body shape, and domain policy. easyJet uses its five-year subject-bound lookup and strict Apple-relay validation. Alaska uses a 13-month query for the exact reservation sender, requires the labeled booking structure and Alaska domain evidence, and derives surname only from one unambiguous two-part name in the labeled `Traveler(s)` block. Unrelated short-code mail, spoofed senders, multiple travelers, and unlabeled names are discarded before presentation. If several eligible bookings remain, the popup shows masked choices and requires the user to select one. HTML-only message normalization preserves HTTPS anchor destinations as inert text without loading them. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
 
-**Residual risk:** Local malware running as the user can inspect process memory or invoke the same credential APIs. Gmail's scope still permits broad read access and requires provider review for public distribution. Live provider audit verification remains required before general release.
+**Residual risk:** Local malware running as the user can inspect process memory or invoke the same credential APIs. Gmail's scope still permits broad read access and requires provider review for public distribution. Historical airline mail and relay formats can change, causing legitimate bookings to be rejected until the deterministic parser is updated. Live provider audit verification remains required before general release.
 
 ### Malicious or resource-exhausting `.eml` import
 
@@ -121,7 +161,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A compromised extension can read arbitrary sites continuously.
 
-**Mitigations:** `activeTab` grants temporary page access only after invocation; `scripting` injects into the main frame. There is no manifest content-script match. Fixed host access is limited to the loopback companion and judge lab. Optional HTTP(S) patterns are declared but not granted by default. Assisted/Auto require an explicit exact-origin permission and store that origin's mode; settings display protocol/host/port and revoke both rule and permission. No path, query, or browsing-history list is retained.
+**Mitigations:** `activeTab` grants temporary page access only after invocation; `scripting` injects the general content path into the main frame. Assisted/Auto require an explicit exact-origin permission and store that origin's mode; settings display protocol/host/port and revoke both rule and permission. The only declarative content script is the synthetic capsule overlay on loopback, and its code-level origin/path/scenario/metadata allowlist fails closed outside the two fixed judge/test ports. Fixed host access is limited to the loopback companion and judge lab. Optional HTTP(S) patterns are declared but not granted by default. No path, query, or browsing-history list is retained.
 
 **Residual risk:** During the active-tab grant, compromised extension code could inspect the active page. Supply-chain and extension integrity still matter.
 
@@ -145,7 +185,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** Automation acts without meaningful consent or a visible chance to cancel; a changed page receives a stale action; a page hides the countdown; filling triggers Verify/Continue, changes unrelated inputs, or modifies hidden/disabled fields.
 
-**Mitigations:** Every origin starts Manual. Assisted/Auto require an exact-origin permission, and Auto requires a separate acknowledgement. Auto renders a top-layer in-page card with waiting/found/verified/countdown states, a visible Cancel action, ARIA live updates, keyboard controls, and reduced-motion behavior. The countdown executes only while its host remains connected and visible; removal/hiding cancels. Immediately before action, ContextFill rechecks the exact tab URL, current hostname and visible action intent, exact-origin rule/permission, candidate age/expiry/replay, and deterministic `allow` policy. Multiple recent allowed candidates with different values block automation. Detection rejects hidden, disabled, read-only, and unrelated inputs; split fills require a contextual 4–8 input group. Mutation uses the native value setter plus `input` and `change` events only. No button click, Enter key, `requestSubmit`, or `submit` call exists. Packaged tests cover countdown cancellation, page removal fail-closed, changed/dynamic SPA state, exact-origin revocation, same-tab handoff, replay block, zero submit count, and unchanged unrelated controls.
+**Mitigations:** Every origin starts Manual. Assisted/Auto require an exact-origin permission, and Auto requires a separate acknowledgement. Auto renders a top-layer in-page card with waiting/found/verified/countdown states, a visible Cancel action, ARIA live updates, keyboard controls, and reduced-motion behavior. The countdown executes only while its host remains connected and visible; removal or hiding cancels. Immediately before action, ContextFill rechecks the exact tab URL, current hostname and visible action intent, exact-origin rule/permission, candidate age/expiry/replay, and deterministic `allow` policy. Multiple recent allowed candidates with different values block automation. Detection rejects hidden, disabled, read-only, and unrelated inputs; split fills require a contextual 4–8 input group, reference fill requires an explicit booking/application/support-reference label, and a capsule requires exactly two empty safe targets in one container. Mutation uses the native value setter plus `input` and `change` events only. Capsule execution verifies every post-set value and atomically rolls back on mismatch. No button click, Enter key, `requestSubmit`, or `submit` call exists. Packaged and installed-Chrome tests cover countdown cancellation, page removal fail-closed, changed/dynamic SPA state, exact-origin revocation, same-tab handoff, replay block, capsule rollback and Undo, zero submit count, and unchanged unrelated controls.
 
 **Residual risk:** A hostile or ordinary page can attach an `input` listener that submits in response to any value change. The extension itself never submits, but it cannot prevent page-owned event handlers; the Auto opt-in explicitly warns about this. A page can visually imitate ContextFill outside the closed Shadow DOM, and assistive technologies/browser combinations may announce live regions differently. A production version should detect synchronous page-owned submission/navigation and offer richer per-action policy.
 
