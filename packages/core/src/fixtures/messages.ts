@@ -69,6 +69,16 @@ export function makeSyntheticInbox(now = new Date()): SyntheticMessage[] {
       serviceHint: 'Cedar Notes',
     },
     {
+      id: 'booking-reference',
+      senderName: 'Cedar Travel',
+      senderAddress: 'bookings@cedartravel.test',
+      subject: 'Your Cedar Travel booking reference',
+      body: 'Your booking reference is CT-7K92Q for managing your trip at trips.cedartravel.test. Keep this reference for your itinerary.',
+      receivedAt: iso(now, -minutes(12)),
+      expiresAt: null,
+      serviceHint: 'Cedar Travel',
+    },
+    {
       id: 'ambiguous-sender',
       senderName: 'Northstar Help',
       senderAddress: 'security@northstar-support.test',
@@ -99,6 +109,11 @@ const scenarioMessageIds: Record<string, string[]> = {
   expired: ['northstar-expired', 'receipt-unrelated'],
   ambiguous: ['ambiguous-sender'],
   empty: ['receipt-unrelated'],
+  'magic-link': ['magic-link'],
+  'magic-link-lookalike': ['magic-link'],
+  'magic-link-complete': [],
+  reference: ['booking-reference'],
+  'reference-lookalike': ['booking-reference'],
 };
 
 export function messagesForScenario(scenario: string | null, now = new Date()): SyntheticMessage[] {

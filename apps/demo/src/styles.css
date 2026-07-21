@@ -321,6 +321,39 @@ main {
   gap: 18px;
 }
 
+.email-waiting {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 4px 12px;
+  padding: 18px;
+  border: 1px solid #b7c6af;
+  border-radius: 14px;
+  background: #f1f7e9;
+}
+
+.email-waiting > span {
+  grid-row: 1 / span 2;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--mint);
+  background: var(--forest);
+  font-weight: 800;
+}
+
+.email-waiting strong {
+  font-size: 13px;
+}
+
+.email-waiting p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .code-field,
 .split-field legend {
   color: #253a34;

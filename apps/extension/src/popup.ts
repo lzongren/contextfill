@@ -36,11 +36,18 @@ import type {
   ContentRequest,
   ContentResponse,
 } from './shared/messages.js';
+import { isMissingHostPermission, siteAccessRequest } from './site-access.js';
+import { performVerifiedNavigation } from './verified-navigation.js';
 
 const app = document.querySelector<HTMLElement>('#app')!;
 const mailboxSetupGuide =
   'https://github.com/lzongren/contextfill/blob/main/docs/MAILBOX_INTEGRATION.md';
-let selected: { ranked: RankedCandidate; page: PageContext } | null = null;
+let selected: {
+  ranked: RankedCandidate;
+  page: PageContext;
+  tabId: number;
+  scannedTabUrl: string;
+} | null = null;
 let clearTimer: ReturnType<typeof setTimeout> | null = null;
 let mailSource: MailSource = 'synthetic';
 let persistedMailSource: PersistentMailSource = 'synthetic';
@@ -72,7 +79,7 @@ function shell(): { body: HTMLElement; footer: HTMLElement } {
   header.append(brand, source);
   const body = element('section', 'app-body');
   const footer = element('footer', 'app-footer');
-  footer.append(element('span', '', 'Explicit fill only'), element('span', '', 'Never submits'));
+  footer.append(element('span', '', 'Explicit action only'), element('span', '', 'Never submits'));
   app.append(header, body, footer);
   return { body, footer };
 }
@@ -114,6 +121,57 @@ function renderMessage(
     retry.addEventListener('click', () => void scan());
     body.append(retry);
   }
+}
+
+function renderSiteAccessRequest(tab: chrome.tabs.Tab): void {
+  selected = null;
+  const site = siteAccessRequest(tab.url);
+  if (!site) {
+    renderMessage(
+      'error',
+      'ContextFill cannot inspect this tab',
+      'Open a normal HTTP or HTTPS webpage and try again.',
+    );
+    return;
+  }
+  const { body } = shell();
+  const icon = element('div', 'message-icon message-icon--error', '!');
+  icon.setAttribute('aria-hidden', 'true');
+  const allow = element('button', 'button button--primary', `Allow on ${site.hostname}`);
+  allow.type = 'button';
+  allow.addEventListener('click', () => {
+    void (async () => {
+      try {
+        const granted = await chrome.permissions.request({ origins: [site.originPattern] });
+        if (!granted) {
+          renderMessage(
+            'error',
+            'Site access was not granted',
+            `ContextFill cannot inspect ${site.hostname} unless you explicitly allow this site.`,
+          );
+          return;
+        }
+        await scan();
+      } catch (error) {
+        renderMessage(
+          'error',
+          'Could not request site access',
+          error instanceof Error ? error.message : 'Close the popup and try again.',
+        );
+      }
+    })();
+  });
+  body.append(
+    icon,
+    element('p', 'kicker', 'Site access required'),
+    element('h1', '', `Allow ContextFill on ${site.hostname}`),
+    element(
+      'p',
+      'muted',
+      'ContextFill needs access to this site only to inspect the requesting context and perform an action you explicitly approve. It never submits a form.',
+    ),
+    allow,
+  );
 }
 
 function row(label: string, value: string): HTMLDivElement {
@@ -180,11 +238,19 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
 
   const heading = element('div', 'candidate-heading');
   const valueWrap = element('div');
-  valueWrap.append(element('span', 'field-label', 'Candidate code'));
-  const value = element('strong', 'candidate-value', view.maskedValue);
+  valueWrap.append(element('span', 'field-label', view.candidateLabel));
+  const value = element(
+    'strong',
+    `candidate-value${view.candidateType === 'magic_link' ? ' candidate-value--link' : ''}`,
+    view.maskedValue,
+  );
   valueWrap.append(value);
   heading.append(valueWrap);
-  if (ranked.policy.decision !== 'block' && ranked.candidate.value) {
+  if (
+    ranked.candidate.type !== 'magic_link' &&
+    ranked.policy.decision !== 'block' &&
+    ranked.candidate.value
+  ) {
     const reveal = element('button', 'text-button', 'Reveal');
     reveal.type = 'button';
     let revealed = false;
@@ -204,6 +270,7 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
     row('Claimed service', view.claimedService),
     row('Requesting website', view.activeDomain),
   );
+  if (view.destination) evidence.append(row('Link destination', view.destination));
   const simulation = view.simulationLabel
     ? element('p', 'simulation-note', `Fixture · ${view.simulationLabel}`)
     : null;
@@ -225,15 +292,29 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
   });
 
   if (ranked.policy.decision === 'allow') {
-    const fill = element(
+    const approve = element(
       'button',
       'button button--primary',
-      `Fill ${page.fieldCount === 1 ? 'code' : `${page.fieldCount} fields`}`,
+      ranked.candidate.type === 'magic_link'
+        ? 'Open verified link in this tab'
+        : ranked.candidate.type === 'reference'
+          ? 'Fill reference'
+          : `Fill ${page.fieldCount === 1 ? 'code' : `${page.fieldCount} fields`}`,
     );
-    fill.type = 'button';
-    fill.addEventListener('click', () => void fillSelected(false));
-    actions.append(fill, dismiss);
-  } else if (ranked.policy.decision === 'warn' && ranked.policy.canOverride) {
+    approve.type = 'button';
+    approve.addEventListener(
+      'click',
+      () =>
+        void (ranked.candidate.type === 'magic_link'
+          ? openSelectedMagicLink()
+          : fillSelected(false)),
+    );
+    actions.append(approve, dismiss);
+  } else if (
+    ranked.candidate.type !== 'magic_link' &&
+    ranked.policy.decision === 'warn' &&
+    ranked.policy.canOverride
+  ) {
     const overrideLabel = element('label', 'override');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -250,7 +331,13 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
     fill.addEventListener('click', () => void fillSelected(true));
     actions.append(overrideLabel, fill, dismiss);
   } else {
-    const blocked = element('p', 'blocked-note', 'Fill is unavailable for this security decision.');
+    const blocked = element(
+      'p',
+      'blocked-note',
+      ranked.candidate.type === 'magic_link'
+        ? 'Opening is unavailable for this security decision.'
+        : 'Fill is unavailable for this security decision.',
+    );
     actions.append(blocked, dismiss);
   }
 
@@ -258,6 +345,44 @@ function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
   if (simulation) body.append(simulation);
   body.append(extraction, actions);
   scheduleClear(ranked);
+}
+
+async function openSelectedMagicLink(): Promise<void> {
+  const current = selected;
+  if (!current || current.ranked.candidate.type !== 'magic_link') return;
+  try {
+    await performVerifiedNavigation(
+      {
+        candidate: current.ranked.candidate,
+        policy: current.ranked.policy,
+        page: current.page,
+        source: mailSource,
+        tabId: current.tabId,
+        scannedTabUrl: current.scannedTabUrl,
+        userApproved: true,
+      },
+      {
+        getTab: async (tabId) => chrome.tabs.get(tabId),
+        markUsed: async (candidateId) => {
+          const response = await backgroundMessage({
+            type: 'MARK_CANDIDATE_USED',
+            candidateId,
+          });
+          if (!response.ok) throw new Error('Could not record one-time link use.');
+        },
+        clearSensitiveState: () => clearSensitiveState('success'),
+        navigate: async (tabId, url) => {
+          await chrome.tabs.update(tabId, { url });
+        },
+      },
+    );
+  } catch (error) {
+    renderMessage(
+      'error',
+      'Could not open this verified link',
+      error instanceof Error ? error.message : 'The initiating tab changed. Scan again.',
+    );
+  }
 }
 
 function sourceAction(label: string, primary = false): HTMLButtonElement {
@@ -337,7 +462,7 @@ function appendProviderCards(body: HTMLElement, statuses: MailProviderStatus[]):
             : 'Refresh authorization is protected by your OS keychain.'
         }`
       : status.configured
-        ? `Connect ${label} with read-only mail access. ContextFill fetches only recent verification-like messages.`
+        ? `Connect ${label} with read-only mail access. ContextFill fetches only recent temporary-action messages.`
         : status.provider === 'outlook'
           ? 'Requires an app registration owned by an Entra tenant. A standalone personal Outlook.com account can use the finished connector but cannot create the registration.'
           : 'Run contextfill-service --setup gmail for an exact callback, then import Google’s downloaded web-client JSON without copying its secret.';
@@ -425,7 +550,7 @@ async function connectProvider(provider: MailProvider): Promise<void> {
     renderMessage(
       'success',
       `Finish connecting ${sourceLabel(provider)}`,
-      'Complete the provider consent screen, then reopen ContextFill on the page requesting a code.',
+      'Complete the provider consent screen, then reopen ContextFill on the page requesting an action.',
     );
   } catch (error) {
     renderMessage(
@@ -443,11 +568,11 @@ async function renderMailSources(): Promise<void> {
   const { body } = shell();
   body.append(
     element('p', 'kicker', 'Message source'),
-    element('h1', '', 'Choose where codes come from'),
+    element('h1', '', 'Choose where messages come from'),
     element(
       'p',
       'muted',
-      'Import one exported message entirely in this popup, or connect read-only mailbox access through the loopback companion. Every source still requires explicit fill approval.',
+      'Import one exported message entirely in this popup, or connect read-only mailbox access through the loopback companion. Every transfer or navigation still requires explicit approval.',
     ),
   );
 
@@ -541,10 +666,14 @@ async function fillSelected(warningOverride: boolean): Promise<void> {
       current.ranked.policy.canOverride);
   if (!allowed) return;
   try {
-    const tab = await activeTab();
-    const response = await contentMessage(tab.id!, {
-      type: 'FILL_CODE',
+    const tab = await chrome.tabs.get(current.tabId);
+    if (tab.url !== current.scannedTabUrl) {
+      throw new Error('The initiating tab changed after ContextFill checked it. Scan again.');
+    }
+    const response = await contentMessage(current.tabId, {
+      type: 'FILL_VALUE',
       value: current.ranked.candidate.value,
+      purpose: current.ranked.candidate.type === 'reference' ? 'reference' : 'verification_code',
       authorized: true,
     });
     if (!response.ok || !response.filled)
@@ -556,8 +685,8 @@ async function fillSelected(warningOverride: boolean): Promise<void> {
     clearSensitiveState('success');
     renderMessage(
       'success',
-      'Code filled',
-      'The verification fields changed. ContextFill did not submit the form.',
+      current.ranked.candidate.type === 'reference' ? 'Reference filled' : 'Code filled',
+      'The matching field changed. ContextFill did not submit the form.',
     );
   } catch (error) {
     renderMessage(
@@ -570,8 +699,9 @@ async function fillSelected(warningOverride: boolean): Promise<void> {
 
 async function scan(): Promise<void> {
   renderLoading();
+  let tab: chrome.tabs.Tab | null = null;
   try {
-    const tab = await activeTab();
+    tab = await activeTab();
     await chrome.scripting.executeScript({ target: { tabId: tab.id! }, files: ['content.js'] });
     const response = await contentMessage(tab.id!, { type: 'SCAN_CONTEXT' });
     if (!response.ok || !response.page)
@@ -595,8 +725,8 @@ async function scan(): Promise<void> {
     if (!first) {
       renderMessage(
         'empty',
-        'No usable verification code',
-        `${sourceLabel(mailSource)} contains no recent verification candidate for this page.`,
+        'No usable temporary action',
+        `${sourceLabel(mailSource)} contains no recent code, verified link, or reference for this page.`,
       );
       return;
     }
@@ -604,9 +734,18 @@ async function scan(): Promise<void> {
       first.policy.reasonCode === 'expired'
         ? { ...first, candidate: { ...first.candidate, value: null } }
         : first;
-    selected = { ranked: displayCandidate, page };
+    selected = {
+      ranked: displayCandidate,
+      page,
+      tabId: tab.id!,
+      scannedTabUrl: tab.url ?? '',
+    };
     renderConfirmation(displayCandidate, page);
   } catch (error) {
+    if (!(error instanceof MailClientError) && tab && isMissingHostPermission(error)) {
+      renderSiteAccessRequest(tab);
+      return;
+    }
     renderMessage(
       'error',
       error instanceof MailClientError

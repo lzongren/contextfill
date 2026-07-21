@@ -272,6 +272,10 @@ function htmlToText(value: string): string {
     value
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(
+        /<a\b[^>]*\bhref\s*=\s*(["'])(https?:\/\/[^"']+)\1[^>]*>/gi,
+        (_match, _quote: string, href: string) => ` ${href} `,
+      )
       .replace(/<br\s*\/?\s*>/gi, '\n')
       .replace(/<\/p\s*>/gi, '\n')
       .replace(/<[^>]+>/g, ' '),
@@ -310,16 +314,23 @@ function inferExpiresAt(body: string, receivedAt: string): string | null {
   return new Date(received + amount * multiplier).toISOString();
 }
 
-function looksVerificationText(text: string): boolean {
-  return (
+function looksTemporaryActionText(text: string): boolean {
+  const hasOtp =
     /\b(verification|verify|security code|one[- ]time|sign[- ]?in|login code|otp|2fa|two[- ]factor|authentication code|auth code|access code|confirmation code|passcode)\b/i.test(
       text,
-    ) && /\b[A-Z0-9]{4,10}\b/i.test(text)
-  );
+    ) && /\b[A-Z0-9]{4,10}\b/i.test(text);
+  const hasMagicLink =
+    /\b(magic link|secure (?:access|sign[- ]?in|login) link|sign[- ]?in link|login link|confirm (?:your )?email|verify (?:your )?email|email confirmation|activate (?:your )?account|(?:sign[- ]?in|log ?in) (?:to|with) [a-z0-9][a-z0-9.'’_-]{1,40})\b/i.test(
+      text,
+    ) && /https:\/\//i.test(text);
+  const hasReference =
+    /\b(booking|application|support)\s+(?:reference|confirmation)\b/i.test(text) &&
+    /\b[A-Z0-9][A-Z0-9-]{4,19}\b/i.test(text);
+  return hasOtp || hasMagicLink || hasReference;
 }
 
-function looksVerificationLike(message: MailboxMessage): boolean {
-  return looksVerificationText(`${message.subject}\n${message.body}`);
+function looksTemporaryActionLike(message: MailboxMessage): boolean {
+  return looksTemporaryActionText(`${message.subject}\n${message.body}`);
 }
 
 export function normalizeGmailMessage(input: unknown): MailboxMessage | null {
@@ -686,7 +697,7 @@ export class MailboxManager implements MailboxManagerLike {
     listUrl.searchParams.set('maxResults', '20');
     listUrl.searchParams.set(
       'q',
-      'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA}',
+      'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
     );
     const listResponse = await this.providerFetch('gmail', listUrl.toString());
     const list = (await listResponse.json()) as { messages?: Array<{ id?: unknown }> };
@@ -718,7 +729,7 @@ export class MailboxManager implements MailboxManagerLike {
       .map((value) => value.data)
       .filter((message) => new Date(message.receivedDateTime).getTime() >= cutoff)
       .filter((message) =>
-        looksVerificationText(`${message.subject ?? ''}\n${message.bodyPreview ?? ''}`),
+        looksTemporaryActionText(`${message.subject ?? ''}\n${message.bodyPreview ?? ''}`),
       )
       .slice(0, 12);
     const messages = await Promise.all(
@@ -735,7 +746,7 @@ export class MailboxManager implements MailboxManagerLike {
     );
     return messages
       .filter((message): message is MailboxMessage => Boolean(message))
-      .filter(looksVerificationLike)
+      .filter(looksTemporaryActionLike)
       .slice(0, 10);
   }
 }

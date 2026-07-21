@@ -1,7 +1,13 @@
 import type { PageContext } from '../../../../packages/core/src/index.js';
 
 export type ContentRequest =
-  { type: 'SCAN_CONTEXT' } | { type: 'FILL_CODE'; value: string; authorized: true };
+  | { type: 'SCAN_CONTEXT' }
+  | {
+      type: 'FILL_VALUE';
+      value: string;
+      purpose: 'verification_code' | 'reference';
+      authorized: true;
+    };
 export type ContentResponse =
   { ok: true; page?: PageContext; filled?: true } | { ok: false; error: string };
 

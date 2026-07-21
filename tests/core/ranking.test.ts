@@ -25,4 +25,39 @@ describe('candidate ranking', () => {
     expect(ranked[0]?.policy.decision).toBe('allow');
     expect(ranked[0]?.rationale).toContain('message is recent');
   });
+
+  it('selects the aligned magic link for a fieldless initiating page', () => {
+    const magicPage: PageContext = {
+      ...page,
+      hostname: 'login.cedarnotes.test',
+      serviceHint: 'Cedar Notes',
+      scenario: 'magic-link',
+      fieldKind: 'none',
+      fieldCount: 0,
+    };
+    const ranked = rankCandidates(extractInboxDeterministic(makeSyntheticInbox(now)), magicPage, {
+      now,
+    });
+    expect(ranked[0]?.candidate.type).toBe('magic_link');
+    expect(ranked[0]?.policy.decision).toBe('allow');
+    expect(ranked[0]?.rationale).toContain('fieldless page matches a verified-link action');
+  });
+
+  it('selects the aligned reference for an explicitly labeled reference field', () => {
+    const referencePage: PageContext = {
+      ...page,
+      hostname: 'trips.cedartravel.test',
+      serviceHint: 'Cedar Travel',
+      scenario: 'reference',
+      fieldKind: 'reference',
+      fieldCount: 1,
+    };
+    const ranked = rankCandidates(
+      extractInboxDeterministic(makeSyntheticInbox(now)),
+      referencePage,
+      { now },
+    );
+    expect(ranked[0]?.candidate).toMatchObject({ type: 'reference', value: 'CT-7K92Q' });
+    expect(ranked[0]?.policy.decision).toBe('allow');
+  });
 });

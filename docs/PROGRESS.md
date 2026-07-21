@@ -33,5 +33,15 @@
 - [x] Reproduced the personal-Outlook `AADSTS50020` path and corrected the CLI, extension, and integration guide to distinguish Entra registration ownership from personal-account sign-in support.
 - [x] Added a secret-safe Gmail setup path that validates Google's downloaded OAuth web-client JSON and exact callback before privately importing credentials.
 - [x] Passed the `v0.2.0-beta.6` local release gate with 52 unit/integration tests, packaged-extension and five installed-Chrome checks, Gmail/Outlook companion clean-install smoke, artifact integrity, and a zero-vulnerability production audit.
-- [ ] Complete live OAuth connections with user-owned Gmail and Outlook app registrations.
+- [x] Completed a user-owned Gmail OAuth connection with read-only scope, OS-keychain refresh-token persistence, bounded recent-message retrieval, and a confirmed real Vialto OTP fill in ChatGPT Atlas.
+- [x] Added exact-origin runtime permission requests and expanded nonsemantic OTP field detection after real-site testing exposed both gaps.
+- [x] Implemented Verified Magic-Link Handoff as the differentiated core: exact URL extraction, HTML-anchor preservation, permanent token masking, local-only URL inspection, sender/page/destination alignment, explicit captured-tab navigation, and replay blocking.
+- [x] Added adversarial magic-link gates for insecure schemes, embedded credentials, IP/local destinations, nonstandard ports, punycode, shorteners, opaque redirect wrappers, domain mismatch, lookalikes, sender conflict, expiry/staleness, and reuse.
+- [x] Added deterministic Trusted Reference Transfer for explicitly labeled booking, application, and support references, including aligned and lookalike judge fixtures and no-submit browser coverage.
+- [x] Passed the beta.7 full release gate: formatting/lint/types, 90 unit/integration tests, three production builds, two packaged-extension acceptance tests, and seven installed-Chrome scenarios.
+- [x] Packaged and integrity-checked the beta.7 extension and companion, completed the clean-install companion smoke, scanned the extension bundle for secret names, and confirmed zero production audit vulnerabilities.
+- [x] Completed a user-observed real Gmail-to-Medium magic-link handoff: local no-fetch inspection, masked URL, aligned sender/page/destination decision, explicit click, and successful same-tab sign-in.
+- [x] Hardened real-provider compatibility after the live run: mixed code/link messages prefer verified handoff, long URLs are removed from bounded supporting evidence, and fallback codes embedded in subjects are masked.
+- [ ] Publish and verify the `v0.2.0-beta.7` public release artifacts and checksums.
+- [ ] Complete a live Outlook connection when an Entra app registration is available; this is not required for the Gmail-backed release.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.

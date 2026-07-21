@@ -1,4 +1,4 @@
-import { fillVerificationFields, type FieldTarget } from '../fields/index.js';
+import { fillTransferValue, type FieldTarget } from '../fields/index.js';
 import type { PolicyResult } from '../types.js';
 
 export function applyExplicitFill(
@@ -11,5 +11,5 @@ export function applyExplicitFill(
     policy.decision === 'allow' ||
     (policy.decision === 'warn' && policy.canOverride && warningOverride);
   if (!approved) return false;
-  return fillVerificationFields(target, value);
+  return fillTransferValue(target, value);
 }

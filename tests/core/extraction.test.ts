@@ -43,9 +43,96 @@ describe('deterministic extraction', () => {
     ).toMatchObject({ value: '654321', type: 'otp' });
   });
 
-  it('classifies a magic link without offering an OTP value', () => {
+  it('extracts the exact magic-login URL as an action candidate', () => {
     const magic = extractDeterministic(messages.find((message) => message.id === 'magic-link')!);
-    expect(magic).toMatchObject({ type: 'magic_link', value: null });
+    expect(magic).toMatchObject({
+      type: 'magic_link',
+      value: 'https://login.cedarnotes.test/magic/sample-token',
+    });
+  });
+
+  it('prefers a one-time sign-in link when the provider also supplies a code', () => {
+    const privateToken = 's'.repeat(450);
+    const url = `https://example.test/auth/${privateToken}`;
+    const candidate = extractDeterministic({
+      id: 'mixed-link-and-code',
+      source: 'gmail',
+      senderName: 'Example',
+      senderAddress: 'login@example.test',
+      subject: 'Sign in to Example',
+      body: `Enter 482913 or sign in to Example: ${url} Verify email`,
+      receivedAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
+      serviceHint: 'Example',
+    });
+    expect(candidate).toMatchObject({
+      type: 'magic_link',
+      value: url,
+    });
+    expect(candidate?.supportingText[0]).toContain('[verified action link withheld]');
+    expect(candidate?.supportingText[0]).not.toContain(privateToken);
+    expect(candidate?.supportingText[0]?.length).toBeLessThanOrEqual(280);
+  });
+
+  it('supports email confirmation but rejects high-risk recovery links', () => {
+    const base = {
+      source: 'gmail' as const,
+      senderName: 'Example',
+      senderAddress: 'hello@example.test',
+      receivedAt: now.toISOString(),
+      expiresAt: null,
+      serviceHint: 'Example',
+    };
+    expect(
+      extractDeterministic({
+        ...base,
+        id: 'confirm-email',
+        subject: 'Confirm your email',
+        body: 'Confirm your email at https://account.example.test/confirm/token-value.',
+      }),
+    ).toMatchObject({
+      type: 'magic_link',
+      value: 'https://account.example.test/confirm/token-value',
+    });
+    expect(
+      extractDeterministic({
+        ...base,
+        id: 'password-reset',
+        subject: 'Reset your password',
+        body: 'Use this password reset link: https://account.example.test/reset/token-value.',
+      }),
+    ).toBeNull();
+  });
+
+  it('does not mistake an unsubscribe URL for a mentioned magic link', () => {
+    expect(
+      extractDeterministic({
+        id: 'unsubscribe-only',
+        source: 'gmail',
+        senderName: 'Example',
+        senderAddress: 'hello@example.test',
+        subject: 'Your magic link was sent separately',
+        body: 'Manage preferences or unsubscribe: https://example.test/unsubscribe/list-token',
+        receivedAt: now.toISOString(),
+        expiresAt: null,
+        serviceHint: 'Example',
+      }),
+    ).toBeNull();
+  });
+
+  it('extracts an explicit booking reference but not a generic order number', () => {
+    const reference = extractDeterministic(
+      messages.find((message) => message.id === 'booking-reference')!,
+    );
+    expect(reference).toMatchObject({
+      type: 'reference',
+      value: 'CT-7K92Q',
+      claimedService: 'Cedar Travel',
+      referencedDomains: ['trips.cedartravel.test'],
+    });
+    expect(
+      extractDeterministic(messages.find((message) => message.id === 'receipt-unrelated')!),
+    ).toBeNull();
   });
 
   it('extracts every supported fixture without throwing', () => {

@@ -1,45 +1,45 @@
 # Under-three-minute demo script
 
-Target spoken time: about 2 minutes 40 seconds. Approximate spoken length: 360 words. Leave pauses for clicks.
+Target spoken time: about 2 minutes 45 seconds. Approximate spoken length: 365 words. Leave pauses for clicks.
 
 ## 0:00–0:20 — Problem
 
-“Verification codes are temporary secrets. Existing autofill makes them convenient to move, but convenience alone does not answer the crucial question: does the message actually belong with the page asking for the code?”
+“‘Check your email’ breaks the task. We leave the site, find the right message, decide whether a one-time link is real, and return to the correct page. OTP autofill solves one narrow format, but it does not provide a transparent trust decision for the broader handoff.”
 
-## 0:20–0:40 — Product and architecture
+## 0:20–0:40 — Product and boundary
 
-“ContextFill securely brings temporary information from a trusted message to the page requesting it, while verifying that the message and website belong together. This prototype is a Chrome Manifest V3 extension, a synthetic inbox, a deterministic trust engine, and an optional local GPT-5.6 extractor. The model extracts facts. Code—not the model—decides allow, warn, or block.”
+“ContextFill safely bridges the gap between checking email and continuing the task—starting with verified magic links. It extracts temporary actions, then deterministic code—not the model—checks the sender, claimed service, destination, active page, freshness, expiry, and replay state. Nothing opens, fills, copies, or submits automatically.”
 
-## 0:40–1:18 — Legitimate fill
+## 0:40–1:20 — Verified magic-link handoff
 
-“This judge lab is running on localhost, so it clearly labels the simulated active domain: `account.northstar.test`. No personal inbox or API key is involved.”
+[Open **Allow · magic link**, then ContextFill.]
 
-[Open ContextFill.]
+“This judge lab clearly labels its simulated domain, `login.cedarnotes.test`; localhost never pretends to be that site. ContextFill found Cedar Notes’ sign-in link without fetching it. The token path is masked. I can inspect the sender, subject, age, claimed service, requesting page, destination, and the deterministic reason for Allow.”
 
-“ContextFill detected one verification field and selected the newest relevant Northstar message. The candidate stays masked. I can inspect the sender, subject, age, claimed service, requesting website, extraction method, and the reason for the decision. The registrable domains align, the message is recent, and the code is unused, so the deterministic policy allows it.”
+“The tab has not moved. ContextFill performs no prefetch, HEAD request, redirect following, or clipboard copy.”
 
-[Click Fill.]
+[Click **Open verified link in this tab**.]
 
-“The field now contains the code. Notice that ContextFill did not click Verify or submit the form. It also marks the candidate used so it cannot be immediately replayed.”
+“Only this click updates the exact initiating tab. The synthetic `.test` target maps to an honestly labeled local completion page. The candidate is now marked used.”
 
-## 1:18–1:55 — Lookalike block
+## 1:20–1:52 — Lookalike block
 
-[Open the lookalike fixture.]
+[Open **Block · link lookalike**, then ContextFill.]
 
-“Now the simulated hostname is `account.n0rthstar.test`, with a zero. The email is still the legitimate Northstar message.”
+“Now the initiating site is `cedarn0tes.test`, with a zero, while the message link targets `cedarnotes.test`. ContextFill compares registrable domains and controlled lookalike signals, blocks the action, keeps the token masked, and exposes no Open or override button.”
 
-[Open ContextFill.]
+## 1:52–2:12 — General transfer primitive
 
-“ContextFill compares registrable domains and controlled lookalike signals. It blocks this transfer, explains the mismatch, hides reveal, and provides no Fill or override action. The page stays unchanged.”
+[Open **Allow · reference**, approve **Fill reference**.]
 
-## 1:55–2:20 — GPT-5.6 boundary
+“The same engine is not hard-coded to OTPs or links. Here it extracts a booking reference, verifies the message-to-site context, and fills only the explicitly labeled field. It never submits. The original single and split OTP flows remain supported.”
 
-“With an API key in the loopback-only companion service, GPT-5.6 classifies one prefiltered message and extracts a strict schema: code, service, domains, expiration evidence, confidence, and excerpts. The service validates that evidence against the source. If the key, service, response, or schema fails, deterministic extraction takes over. GPT-5.6 never authorizes transfer.”
+## 2:12–2:32 — GPT-5.6 and privacy boundary
 
-## 2:20–2:42 — Codex collaboration
+“The optional loopback companion can use GPT-5.6 to classify one prefiltered message into a strict schema. Application code verifies copied evidence, rejects high-risk recovery, payment, and signing links, and independently authorizes every action. Without a key—or on any model failure—the deterministic path remains fully functional.”
 
-“I used Codex as the lead engineering workspace from an empty repository through architecture, implementation, security review, browser testing, packaging, and these submission materials. Its test loop caught and corrected a real split-field scoring conflict before release.”
+## 2:32–2:48 — Codex collaboration and close
 
-## 2:42–2:55 — Impact and close
+“I used Codex from architecture through implementation, real Gmail integration, security review, browser testing, packaging, and release automation. Human testing corrected real-site permissions and field detection, then product review made verified magic-link handoff the differentiated core.”
 
-“ContextFill is a hackathon prototype, not a claim of perfect phishing detection. Its idea is broader than OTP extraction: make context and consent visible before sensitive information crosses from one trusted place into another.”
+“ContextFill is a hackathon prototype, not phishing-proof. Its idea is simple: make context, destination, and consent visible before email advances the task.”

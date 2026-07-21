@@ -1,3 +1,4 @@
+import { inspectMagicLink, isSupportedMagicLinkText } from '../actions/links.js';
 import {
   analyzeHost,
   detectLookalike,
@@ -34,27 +35,53 @@ export function evaluateTrust(
   options: PolicyOptions = {},
 ): PolicyResult {
   const now = options.now ?? new Date();
-  const maxAgeMs = (options.maxAgeMinutes ?? 15) * 60_000;
   const active = analyzeHost(page.hostname);
   const used = options.usedCandidateIds?.has(candidate.id) ?? false;
+  const isMagicLink = candidate.type === 'magic_link';
+  const isReference = candidate.type === 'reference';
+  const maxAgeMinutes = options.maxAgeMinutes ?? (isReference ? 24 * 60 : 15);
+  const maxAgeMs = maxAgeMinutes * 60_000;
 
-  if (page.fieldKind === 'none') {
+  if (!candidate.value || !['otp', 'magic_link', 'reference'].includes(candidate.type)) {
     return result(
       {
         decision: 'block',
-        reason: 'No usable verification-code field was found on this page.',
+        reason: 'This message does not contain a supported temporary action.',
+        reasonCode: 'unsupported_candidate',
+        canOverride: false,
+      },
+      active.registrableDomain,
+    );
+  }
+  if (
+    (candidate.type === 'otp' && !['single', 'split'].includes(page.fieldKind)) ||
+    (isReference && page.fieldKind !== 'reference')
+  ) {
+    return result(
+      {
+        decision: 'block',
+        reason: isReference
+          ? 'No matching reference field was found on this page.'
+          : 'No usable verification-code field was found on this page.',
         reasonCode: 'no_field',
         canOverride: false,
       },
       active.registrableDomain,
     );
   }
-  if (candidate.type !== 'otp' || !candidate.value) {
+  const linkInspection = isMagicLink ? inspectMagicLink(candidate.value) : null;
+  if (
+    isMagicLink &&
+    (!isSupportedMagicLinkText(`${candidate.subject}\n${candidate.supportingText.join('\n')}`) ||
+      !linkInspection?.safe)
+  ) {
     return result(
       {
         decision: 'block',
-        reason: 'This message does not contain a supported verification code.',
-        reasonCode: 'unsupported_candidate',
+        reason:
+          linkInspection?.reason ??
+          'Only magic-login and email-confirmation links are eligible for verified handoff.',
+        reasonCode: linkInspection?.safe === false ? 'unsafe_link' : 'unsupported_candidate',
         canOverride: false,
       },
       active.registrableDomain,
@@ -64,7 +91,11 @@ export function evaluateTrust(
     return result(
       {
         decision: 'block',
-        reason: 'This code was already filled during this browser session.',
+        reason: isMagicLink
+          ? 'This action link was already opened during this browser session.'
+          : isReference
+            ? 'This reference was already transferred during this browser session.'
+            : 'This code was already filled during this browser session.',
         reasonCode: 'used',
         canOverride: false,
       },
@@ -76,7 +107,11 @@ export function evaluateTrust(
     return result(
       {
         decision: 'block',
-        reason: 'The message says this verification code has expired.',
+        reason: isMagicLink
+          ? 'The message says this action link has expired.'
+          : isReference
+            ? 'The message says this reference is no longer valid.'
+            : 'The message says this verification code has expired.',
         reasonCode: 'expired',
         canOverride: false,
       },
@@ -88,7 +123,7 @@ export function evaluateTrust(
     return result(
       {
         decision: 'block',
-        reason: 'The message is outside the 15-minute verification window.',
+        reason: `The message is outside the ${isReference ? '24-hour reference' : '15-minute temporary-action'} window.`,
         reasonCode: 'stale',
         canOverride: false,
       },
@@ -107,6 +142,67 @@ export function evaluateTrust(
         canOverride: false,
       },
       active.registrableDomain,
+    );
+  }
+
+  if (isMagicLink && linkInspection?.safe && linkInspection.hostname) {
+    const destination = linkInspection.hostname;
+    const destinationMatchesPage = domainsAlign(page.hostname, destination);
+    const lookalikeSignals = detectLookalike(page.hostname, [destination]);
+    if (!destinationMatchesPage) {
+      return result(
+        {
+          decision: 'block',
+          reason:
+            lookalikeSignals.length > 0
+              ? 'The requesting site resembles the link destination but has a different registrable domain.'
+              : 'The link destination does not match the site that initiated this action.',
+          reasonCode: lookalikeSignals.length > 0 ? 'lookalike' : 'destination_mismatch',
+          canOverride: false,
+        },
+        active.registrableDomain,
+        null,
+        lookalikeSignals,
+      );
+    }
+
+    const sender = senderDomain(candidate.senderAddress);
+    if (!sender || !domainsAlign(sender, destination)) {
+      return result(
+        {
+          decision: 'warn',
+          reason: sender
+            ? 'The page and link destination match, but the sender uses a different registrable domain.'
+            : 'The page and link destination match, but the message has no verifiable sender domain.',
+          reasonCode: 'sender_conflict',
+          canOverride: false,
+        },
+        active.registrableDomain,
+        destination,
+      );
+    }
+    if (candidate.confidence < 0.8) {
+      return result(
+        {
+          decision: 'warn',
+          reason:
+            'The page, sender, and link destination match, but extraction confidence is only moderate.',
+          reasonCode: 'moderate_confidence',
+          canOverride: false,
+        },
+        active.registrableDomain,
+        destination,
+      );
+    }
+    return result(
+      {
+        decision: 'allow',
+        reason: `The page, sender, and link destination share ${active.registrableDomain}; the message is recent and unused.`,
+        reasonCode: 'aligned',
+        canOverride: false,
+      },
+      active.registrableDomain,
+      destination,
     );
   }
 
@@ -171,7 +267,7 @@ export function evaluateTrust(
   return result(
     {
       decision: 'allow',
-      reason: `The page and message share ${active.registrableDomain}, and the code is recent and unused.`,
+      reason: `The page and message share ${active.registrableDomain}, and the ${isReference ? 'reference' : 'code'} is recent and unused.`,
       reasonCode: 'aligned',
       canOverride: false,
     },

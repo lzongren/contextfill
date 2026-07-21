@@ -2,34 +2,35 @@
 
 Use a clean Chrome profile, crop out unrelated tabs/profile details, and never show `.env`, terminal environment values, personal mail, API dashboards, or keys.
 
-## 1. Legitimate confirmation card
+## 1. Verified magic-link confirmation card
 
-- Page: `?scenario=legitimate-single`.
-- Extension state: Allowed, code still masked.
-- Must show: sender, subject, message age, Northstar, `account.northstar.test`, deterministic decision reason, and explicit Fill button.
+- Page: `?scenario=magic-link`.
+- Extension state: Allowed, one-time path permanently masked.
+- Must show: sender, subject, message age, Cedar Notes, requesting site and destination `login.cedarnotes.test`, deterministic reason, and **Open verified link in this tab**.
 - Composition: judge lab's simulated-domain banner behind or beside the popup so the relationship is immediately legible.
+- Confirm `sample-token` is absent before capturing.
 
-## 2. Filled split-code form
+## 2. Blocked magic-link lookalike
 
-- Page: `?scenario=legitimate-split` after clicking **Fill 6 fields**.
-- Must show: six digits in order, untouched Remember checkbox, and **The form has not been submitted.**
-- Do not click Verify.
-
-## 3. Blocked lookalike
-
-- Page: `?scenario=lookalike`.
+- Page: `?scenario=magic-link-lookalike`.
 - Extension state: Blocked.
-- Must show: simulated `account.n0rthstar.test`, message/request mismatch explanation, masked code, and no Fill/override action.
-- This is the strongest hero image because it communicates the differentiator in one frame.
+- Must show: simulated `login.cedarn0tes.test`, verified destination `login.cedarnotes.test`, mismatch/lookalike explanation, masked link, and no Open/override action.
+- This is the strongest hero image because it communicates sender/page/destination verification in one frame.
+
+## 3. Trusted reference transfer
+
+- Page: `?scenario=reference`, first with the allowed popup and then after **Fill reference**.
+- Must show: explicit booking-reference field, unchanged Remember checkbox, and **The form has not been submitted.**
+- This image proves the trust engine generalizes beyond links and OTP.
 
 ## 4. Optional architecture diagram
 
 - Use the Mermaid architecture diagram from `README.md` or redraw it with the same factual boundaries.
-- Emphasize: message facts → deterministic policy → explicit user action → page mutation; never submission.
+- Emphasize: message facts → local URL inspection → deterministic policy → explicit same-tab action or field mutation; never prefetch or submission.
 
 ## 5. Optional GPT/fallback indicator
 
-- Capture one legitimate card with **Deterministic fallback active · no API key required**.
+- Capture one legitimate card with **Deterministic extraction · policy decided locally**.
 - If a live key is safely configured off-screen, capture another with **GPT-5.6 extracted message facts · deterministic policy decided**.
 - Never include the service terminal, `.env`, request headers, or API account page.
 
@@ -38,5 +39,5 @@ Use a clean Chrome profile, crop out unrelated tabs/profile details, and never s
 - Close personal tabs and notifications.
 - Use synthetic fixtures only.
 - Keep the browser zoom and popup size at defaults.
-- Record the two mandatory paths first in case later optional material must be cut.
+- Record the magic-link allow and block paths first in case later material must be cut.
 - Verify the final video remains under three minutes before uploading publicly to YouTube.

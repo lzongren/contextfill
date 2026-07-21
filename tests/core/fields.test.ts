@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  fillTransferValue,
+  findContextField,
+  findReferenceField,
   findVerificationFields,
   fillVerificationFields,
   scoreVerificationField,
@@ -36,5 +39,91 @@ describe('field detection and filling', () => {
     expect(document.querySelector<HTMLInputElement>('#other')?.value).toBe('keep');
     expect(inputEvents).toHaveBeenCalledTimes(6);
     expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('recognizes a nested six-box access-code widget without semantic form containers', () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Access Code Sent</h1>
+        <div>
+          <p>Enter your one-time access code</p>
+          <div class="visual-code-row">
+            ${Array.from({ length: 6 }, (_, index) => `<span><input type="tel" inputmode="numeric" maxlength="1" aria-label="Access code digit ${index + 1}" data-contextfill-visible="true"></span>`).join('')}
+          </div>
+        </div>
+        <button type="button">Login</button>
+      </main>`;
+
+    const target = findVerificationFields(document);
+    expect(target?.kind).toBe('split');
+    expect(target?.elements).toHaveLength(6);
+    expect(fillVerificationFields(target!, '730418')).toBe(true);
+    expect(target?.elements.map((input) => input.value).join('')).toBe('730418');
+  });
+
+  it('does not group unrelated one-character controls without verification context', () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Preference survey</h1>
+        <div>${Array.from({ length: 6 }, (_, index) => `<input maxlength="1" aria-label="Rating ${index + 1}" data-contextfill-visible="true">`).join('')}</div>
+      </main>`;
+
+    expect(findVerificationFields(document)).toBeNull();
+  });
+
+  it('recognizes numeric digit boxes whose one-character limit is enforced by script', () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Access Code Sent</h1>
+        <div class="access-code-widget">
+          ${Array.from({ length: 6 }, () => '<span><input type="tel" inputmode="numeric" data-contextfill-visible="true"></span>').join('')}
+        </div>
+      </main>`;
+
+    const target = findVerificationFields(document);
+    expect(target?.kind).toBe('split');
+    expect(target?.elements).toHaveLength(6);
+  });
+
+  it('recognizes a single access-code input inside non-semantic layout containers', () => {
+    document.body.innerHTML = `
+      <main>
+        <div><h1>Access Code Sent</h1><div><input type="tel" maxlength="6" data-contextfill-visible="true"></div></div>
+      </main>`;
+
+    const target = findVerificationFields(document);
+    expect(target?.kind).toBe('single');
+    expect(target?.elements).toHaveLength(1);
+  });
+
+  it('does not treat a generic multi-input login form as a split access code', () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Login details</h1>
+        <div>${Array.from({ length: 6 }, (_, index) => `<input type="number" aria-label="Preference ${index + 1}" data-contextfill-visible="true">`).join('')}</div>
+      </main>`;
+
+    expect(findVerificationFields(document)).toBeNull();
+  });
+
+  it('recognizes one explicitly labeled booking-reference field without confusing generic text', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Last name<input name="lastName" data-contextfill-visible="true"></label>
+        <label>Booking reference<input name="bookingReference" maxlength="20" data-contextfill-visible="true"></label>
+        <button>Find trip</button>
+      </form>`;
+
+    const target = findReferenceField(document);
+    expect(target?.kind).toBe('reference');
+    expect(target?.elements[0]?.name).toBe('bookingReference');
+    expect(findContextField(document)?.kind).toBe('reference');
+    expect(fillTransferValue(target!, 'CT-7K92Q')).toBe(true);
+    expect(target?.elements[0]?.value).toBe('CT-7K92Q');
+  });
+
+  it('does not classify a generic order-number input as a trusted reference target', () => {
+    document.body.innerHTML = `<label>Order number<input name="orderNumber" data-contextfill-visible="true"></label>`;
+    expect(findReferenceField(document)).toBeNull();
   });
 });

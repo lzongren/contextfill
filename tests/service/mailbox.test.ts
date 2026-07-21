@@ -37,6 +37,26 @@ function gmailMessage(id = 'gmail-message-1') {
   };
 }
 
+function gmailMagicLinkMessage(id = 'gmail-magic-link') {
+  return {
+    id,
+    internalDate: String(now.getTime()),
+    snippet: 'Confirm your email to continue.',
+    payload: {
+      mimeType: 'text/html',
+      headers: [
+        { name: 'From', value: 'Cedar Notes <hello@cedarnotes.example>' },
+        { name: 'Subject', value: 'Confirm your email' },
+      ],
+      body: {
+        data: encoded(
+          '<p>Confirm your email to continue.</p><a href="https://login.cedarnotes.example/confirm/private-token?nonce=secret&amp;source=email">Confirm email</a>',
+        ),
+      },
+    },
+  };
+}
+
 function outlookMessage(id = 'outlook-message-1') {
   return {
     id,
@@ -77,6 +97,18 @@ describe('mailbox message normalization', () => {
       expiresAt: '2026-07-20T19:10:00.000Z',
     });
   });
+
+  it('preserves an HTML-only Gmail action URL without fetching it', () => {
+    const normalized = normalizeGmailMessage(gmailMagicLinkMessage());
+    expect(normalized).toMatchObject({
+      id: 'gmail:gmail-magic-link',
+      source: 'gmail',
+      subject: 'Confirm your email',
+    });
+    expect(normalized?.body).toContain(
+      'https://login.cedarnotes.example/confirm/private-token?nonce=secret&source=email',
+    );
+  });
 });
 
 describe('mailbox OAuth and provider adapters', () => {
@@ -92,6 +124,11 @@ describe('mailbox OAuth and provider adapters', () => {
         return Response.json({ emailAddress: 'person@gmail.example' });
       }
       if (url.includes('/users/me/messages?')) {
+        const query = new URL(url).searchParams.get('q');
+        expect(query).toContain('"magic link"');
+        expect(query).toContain('"secure access link"');
+        expect(query).toContain('"sign in to"');
+        expect(query).toContain('"booking reference"');
         return Response.json({ messages: [{ id: 'gmail-message-1' }] });
       }
       if (url.includes('/users/me/messages/gmail-message-1?format=full')) {

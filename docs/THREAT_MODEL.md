@@ -6,9 +6,9 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 ## Assets
 
-- The temporary verification-code value.
-- The relationship between a message, service, and requesting site.
-- The user's explicit consent to reveal or fill.
+- One-time link tokens, verification codes, and trusted references.
+- The relationship between a message, sender, service, destination, and initiating site.
+- The user's explicit consent to open or fill.
 - The optional OpenAI API key.
 - Gmail and Microsoft OAuth access and refresh tokens.
 - The per-install loopback pairing capability.
@@ -19,13 +19,13 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 1. **Webpage → isolated content script:** the page DOM, labels, metadata, and fields are untrusted. Only localhost may provide a simulated hostname.
 2. **Mailbox provider, imported file, or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, attachments, and any instructions in a message are untrusted data.
-3. **Extension popup → content script:** only an explicit popup action carries a value to a currently detected field.
+3. **Extension popup → content script or initiating tab:** only an explicit popup action carries a value to a currently detected field or navigates the exact tab and URL captured during inspection.
 4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require a paired capability and matching extension installation ID; browser `Origin` is cross-checked when present.
 5. **Loopback service → OS credential manager:** refresh tokens and the hashed pairing record persist through the native platform keychain; access tokens remain in memory.
 6. **Loopback service → Gmail/Microsoft APIs:** only bounded recent-message queries are made with delegated read-only scopes.
 7. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
 8. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
-9. **Policy → mutation:** an allow decision, or an acknowledged warn decision, is required before filling. Block cannot be overridden.
+9. **Policy → mutation/navigation:** an allow decision is required before link navigation. An allow decision, or an acknowledged eligible warning, is required before field filling. Link warnings and all block decisions cannot be overridden.
 
 ## Threats and mitigations
 
@@ -45,11 +45,19 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Residual risk:** The skeleton is intentionally incomplete. It does not solve every Unicode script, visual rendering, or brand impersonation attack.
 
+### One-time link is consumed, redirected, or opened on the wrong site
+
+**Threat:** Inspection consumes a one-time token, an opaque tracking wrapper hides the real destination, a link targets a different service, or an allowed link opens automatically or in a new tab that loses the initiating context.
+
+**Mitigations:** Inspection uses only the URL string already present in the normalized message. ContextFill performs no `fetch`, `HEAD`, preconnect, prefetch, redirect resolution, Safe Browsing lookup, image load, or clipboard copy. The deterministic inspector requires HTTPS and a registrable hostname; rejects embedded credentials, IP and local destinations, nonstandard ports, punycode/internationalized hosts, known shorteners, and opaque click/redirect paths; masks the final path segment plus all query/fragment data; and requires the destination registrable domain to align with both the initiating page and sender. The policy must be **allow**, the candidate must be fresh and unused, and the user must click **Open verified link in this tab**. The controller rechecks that the captured tab still has the exact scanned URL, records replay state, clears candidate state, and calls `chrome.tabs.update` only for that captured tab. Synthetic `.test` links map to an explicitly labeled localhost completion fixture without fetching or pretending to visit the represented domain.
+
+**Residual risk:** A same-domain endpoint can redirect after the explicit navigation, DNS or server ownership can change, and the destination service ultimately controls the response. ContextFill deliberately refuses links whose destination cannot be established locally, but it cannot prove future network behavior without consuming the link. Public-suffix, URL-parser, browser, and extension integrity remain trusted dependencies.
+
 ### Compromised or spoofed sender
 
 **Threat:** A message claims the right service while arriving from an unrelated sender domain.
 
-**Mitigations:** Sender and referenced-domain evidence are separate. A sender-domain conflict produces a warning even when the message references the current site. Message instructions cannot change policy.
+**Mitigations:** Sender and referenced-domain evidence are separate. A sender-domain conflict produces a warning even when the message references the current site. Magic-link warnings cannot be overridden; navigation requires sender, destination, and page alignment. Message instructions cannot change policy.
 
 **Residual risk:** The prototype does not inspect SPF, DKIM, DMARC, transport headers, account compromise, or mailbox provider reputation. A visually correct sender is not cryptographic proof.
 
@@ -65,23 +73,23 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** GPT-5.6 invents a code/domain, returns partial JSON, or includes unexpected fields.
 
-**Mitigations:** Responses API strict JSON schema, Zod validation, code-presence checks, domain-presence filtering, excerpt-presence filtering, bounded confidence, timeouts, no retries, and deterministic fallback. The model is never the final authority for allow/warn/block.
+**Mitigations:** Responses API strict JSON schema, Zod validation, value-presence checks, domain-presence filtering, excerpt-presence filtering, bounded confidence, timeouts, no retries, and deterministic fallback. Model-selected link intents are independently checked against the full source message; password reset, recovery, payment, and signing actions are rejected. Every selected URL still passes deterministic URL inspection and policy. The model is never the final authority for allow/warn/block.
 
 **Residual risk:** A wrong value already present somewhere in an adversarial message could pass presence validation. Verification-language proximity, confidence, ranking, and domain policy remain important.
 
-### Code replay
+### Temporary-action replay
 
-**Threat:** The same code is filled again during a session or extraction-method changes bypass replay state.
+**Threat:** The same code, link, or reference is used again during a session or an extraction-method change bypasses replay state.
 
-**Mitigations:** Both model and fallback use a stable message-derived candidate ID. Successful fill records only that ID in the MV3 background worker for 15 minutes. The policy blocks used IDs before domain evaluation.
+**Mitigations:** Both model and fallback use a stable message-derived candidate ID. Successful fill or link opening records only that ID in the MV3 background worker for 15 minutes. The policy blocks used IDs before domain evaluation.
 
 **Residual risk:** Browser/extension restart can clear in-memory replay state. No durable replay database is used by design.
 
-### Expired or stale code
+### Expired or stale action
 
-**Threat:** An old but otherwise matching code is transferred.
+**Threat:** An old but otherwise matching code, link, or reference is transferred.
 
-**Mitigations:** Explicit `expiresAt` at or before the current time blocks. Messages older than the 15-minute window block. Expired values are removed from retained confirmation state immediately.
+**Mitigations:** Explicit `expiresAt` at or before the current time blocks. OTP and magic-link messages older than 15 minutes block; the narrowly scoped reference path uses a documented 24-hour freshness window. Expired values are removed from retained confirmation state immediately.
 
 **Residual risk:** Real providers use varying validity wording. The connectors infer common minute/hour phrases, but absent or unusual expiry evidence still falls back to the general freshness window.
 
@@ -89,7 +97,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A local attacker steals a refresh token, a connector requests write access, or an API response causes broad mailbox disclosure.
 
-**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. The non-secret readiness doctor derives callbacks and scopes from runtime configuration, rejects service/callback port drift, and checks private `.env` permissions before consent. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail searches one day of verification-like mail and retrieves at most 12 bodies; Outlook filters 25 recent messages to at most 10 verification-like results. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
+**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. The non-secret readiness doctor derives callbacks and scopes from runtime configuration, rejects service/callback port drift, and checks private `.env` permissions before consent. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail searches one day of temporary-action phrases and retrieves at most 12 bodies; Outlook filters 25 recent summaries to at most 10 code, magic-link, or reference-like results. HTML-only message normalization preserves HTTPS anchor destinations as inert text without loading them. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
 
 **Residual risk:** Local malware running as the user can inspect process memory or invoke the same credential APIs. Gmail's scope still permits broad read access and requires provider review for public distribution. Live provider audit verification remains required before general release.
 
@@ -103,9 +111,9 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 ### Sensitive logs, clipboard, storage, and analytics
 
-**Threat:** A full code leaks through console output, clipboard, persistent extension storage, telemetry, or screenshots.
+**Threat:** A full code, reference, or one-time link token leaks through UI, logs, clipboard, persistent extension storage, telemetry, or screenshots.
 
-**Mitigations:** Production code does not log codes, never touches the clipboard, and has no analytics. Extension storage contains only the selected persistent source, model opt-in, and random pairing capability; access is restricted to trusted extension contexts. Imported files, codes, message bodies, and OAuth tokens are excluded. Values are masked by default, cannot be revealed on blocks, and clear from popup state after fill/dismiss/expiry/90 seconds. Refresh tokens and only the hash of the pairing capability use the OS keychain.
+**Mitigations:** Production code does not log candidate values, never touches the clipboard, and has no analytics. Extension storage contains only the selected persistent source, model opt-in, and random pairing capability; access is restricted to trusted extension contexts. Imported files, candidate values, message bodies, and OAuth tokens are excluded. Codes and references are masked by default and cannot be revealed on blocks; link path/query/fragment secrets are never revealed. Candidate state clears after action/dismissal/expiry/90 seconds. Refresh tokens and only the hash of the pairing capability use the OS keychain.
 
 **Residual risk:** A user can intentionally reveal or photograph a code. Browser developer tooling or local profile access can expose extension memory and its pairing capability.
 
@@ -113,7 +121,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A compromised extension can read arbitrary sites continuously.
 
-**Mitigations:** `activeTab` grants temporary page access only after invocation; `scripting` injects on demand into the main frame. There is no `<all_urls>` or persistent content-script match. The only permanent host permission is the exact optional loopback service origin.
+**Mitigations:** `activeTab` grants temporary page access only after invocation; `scripting` injects on demand into the main frame. There is no persistent content-script match. Fixed host access is limited to the loopback companion and judge lab. Optional HTTP(S) patterns are declared but not granted by default; if injection lacks access, the popup requests one exact origin at runtime and continues only after the user grants it.
 
 **Residual risk:** During the active-tab grant, compromised extension code could inspect the active page. Supply-chain and extension integrity still matter.
 
@@ -133,11 +141,11 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Residual risk:** A local process running as the user can call loopback directly and may be able to inspect browser profile storage. Pairing authenticates the intended browser client against ordinary web-origin requests; it is not a sandbox against local malware. Request accounting and packaged-service integrity remain future hardening.
 
-### Automatic submission or unintended page mutation
+### Automatic navigation, submission, or unintended page mutation
 
-**Threat:** Filling triggers Verify/Continue, changes unrelated numeric inputs, or modifies hidden/disabled fields.
+**Threat:** Merely opening ContextFill navigates or consumes a link, or filling triggers Verify/Continue, changes unrelated inputs, or modifies hidden/disabled fields.
 
-**Mitigations:** Detection rejects hidden, disabled, read-only, and unrelated inputs; split fills require a contextual 4–8 input group. Mutation uses the native value setter plus `input` and `change` events only. No button click, Enter key, `requestSubmit`, or `submit` call exists. Unit and installed-Chrome tests assert submit count remains zero and unrelated controls stay unchanged.
+**Mitigations:** Scanning and confirmation never call the navigation controller. Only the explicit Open button can invoke same-tab navigation. Detection rejects hidden, disabled, read-only, and unrelated inputs; split fills require a contextual 4–8 input group, and reference fill requires an explicit booking/application/support-reference label. Mutation uses the native value setter plus `input` and `change` events only. Both fill and navigation recheck the exact captured tab URL. No button click, Enter key, `requestSubmit`, or `submit` call exists. Unit, packaged-extension, and installed-Chrome tests assert inert inspection, same-tab handoff, replay block, zero submit count, and unchanged unrelated controls.
 
 **Residual risk:** A hostile page can attach an `input` listener that submits in response to any value change. The extension itself never submits, but it cannot prevent page-owned event handlers. A production version should warn about or detect synchronous navigation/submission after mutation.
 
@@ -153,7 +161,9 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 - Verifying mailbox transport authentication or sender account integrity.
 - Hosted multi-user mailbox service or server-side storage of user mail.
 - Hosted synchronization of OAuth credentials or mailbox content.
-- Password capture, password-manager behavior, clipboard management, or automatic navigation.
+- Password capture, password-manager behavior, clipboard management, link prefetch, automatic navigation, or automatic submission.
+- Password-reset, account-recovery, payment-authorization, wire-transfer, document-signing, or e-signature links.
+- URL shorteners, opaque click/redirect wrappers, IP/local destinations, nonstandard link ports, or internationalized link destinations.
 - Iframe, cross-origin frame, or closed shadow-root field support.
-- Magic-link opening, order references, or booking references in the P0/P1 release.
+- Generic order-number extraction or arbitrary message-to-form automation; references are limited to explicitly labeled booking, application, and support workflows.
 - Durable replay prevention across restarts or enforcement by the destination service.

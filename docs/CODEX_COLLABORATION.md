@@ -6,7 +6,7 @@ This document records observed work from the primary build session. It must be u
 
 - Translated a detailed product/security specification into a sequenced build and acceptance plan.
 - Initialized the empty Git repository as a strict TypeScript workspace.
-- Implemented the synthetic inbox, deterministic extractor, candidate schema, ranking, registrable-domain handling, lookalike fixtures, policy engine, confirmation model, and conservative field mutation.
+- Implemented the synthetic inbox, deterministic extractor, candidate schema, local URL inspector, ranking, registrable-domain handling, lookalike fixtures, policy engine, confirmation model, explicit same-tab navigation, and conservative field mutation.
 - Built the local judge lab, MV3 extension, optional GPT-5.6 companion service, release scripts, and all required documentation.
 - Ran format, lint, types, unit, integration, extension-load, installed-Chrome, live loopback, packaging, and visual QA checks.
 - Performed a focused threat review and kept model extraction separate from authorization.
@@ -22,6 +22,9 @@ The human supplied and constrained:
 - The mandatory no-personal-email judge path.
 - The deterministic policy boundary, permission constraints, required scenarios, security guarantees, and definition of done.
 - The instruction to work autonomously and continue through packaging and submission preparation.
+- The insistence that the product work with real mailboxes and real websites rather than remain a synthetic hackathon demo.
+- The correction that OTP alone was not sufficiently differentiated and the selection of Verified Magic-Link Handoff as the core goal, with Trusted Reference Transfer as the generalization proof.
+- Hands-on Google Cloud registration, Gmail OAuth consent, extension reloads, and real Vialto OTP validation.
 
 ## Decisions made collaboratively
 
@@ -29,7 +32,9 @@ The human supplied and constrained:
 - Use a deliberately visible localhost simulation instead of claiming test domains are real deployed sites.
 - Use vanilla DOM rendering rather than React because both interfaces have compact state.
 - Keep GPT-5.6 optional so judges can test the full differentiating flow without credentials.
-- Restrict permanent host access to the exact loopback service and use `activeTab` for webpages.
+- Keep fixed host access to local product surfaces, use `activeTab` first, and request one exact real-site origin only when Chromium requires it.
+- Inspect magic links without any network call, keep their token-bearing components permanently masked, and bind navigation to an explicit click in the captured initiating tab.
+- Exclude password reset, recovery, payment, signing, opaque redirects, and generic order-number transfer from the new action boundary.
 
 ## Where Codex output required correction
 
@@ -37,12 +42,15 @@ The human supplied and constrained:
 - The first split browser assertion used a locator API shape incompatible with the installed Playwright runtime. Codex replaced it with a bounded DOM projection and reran the suite.
 - Stable Chrome's headless channel did not side-load the extension for the manifest test. Codex switched that test to Playwright's supported bundled Chromium path while keeping functional page acceptance on installed Chrome.
 - The official OpenAI documentation connector could not install because the local Codex executable path was missing. Codex used official OpenAI-domain fallback sources and recorded them in `docs/REFERENCES.md`.
+- The first real Vialto run could not inspect the page because `activeTab` alone did not provide usable host access in ChatGPT Atlas. Codex added an explicit exact-origin runtime permission card; the user granted and confirmed it.
+- The real Vialto access-code widget enforced single digits with JavaScript and lacked semantic form containers. Codex expanded context and split-field heuristics while adding false-positive tests; the user then confirmed a live Gmail-to-page fill.
+- The initial product narrative remained OTP-centric even after real mailbox integration. The human rejected that as insufficiently differentiated, a research subagent compared adjacent use cases, and the main session implemented verified magic links and trusted references instead of defending the narrower scope.
 
 ## Main-session artifacts
 
 All code, tests, build scripts, threat analysis, README, judge instructions, demo script, screenshot plan, and Devpost draft currently in this repository were produced and verified in the primary ContextFill Codex session that began with an empty repository.
 
-No live OpenAI API key was configured during the release run. Model behavior was validated through strict schemas, injected/malformed responses, evidence checks, fallback integration tests, and production builds. The repository owner can optionally run the live path before recording.
+No live OpenAI API key was configured during the release run. Model behavior was validated through strict schemas, injected/malformed responses, evidence checks, high-risk-action rejection, fallback integration tests, and production builds. A user-owned read-only Gmail connection and real Vialto OTP flow were validated separately; public screenshots must continue to use only synthetic data.
 
 ## Submission metadata
 
