@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-07-21
+
+- [x] Implemented Verified Context Capsules as the airline-check-in hero flow: exactly one booking reference and passenger surname, a compact Message → trust checks → capsule → destination trace, explicit two-field transfer, truthful no-submit receipt, and Undo.
+- [x] Added strict Zod schemas and deterministic/model extraction boundaries; GPT-5.6 can return source-grounded facts only and cannot authorize or choose fields.
+- [x] Added deterministic sender/service/origin/freshness/expiry/replay policy with controlled lookalike blocking and action-time revalidation.
+- [x] Added conservative two-field mapping that rejects sensitive, hidden, disabled, zero-size, offscreen, ambiguous, nonempty, overlong, and split-container targets.
+- [x] Made execution atomic through post-set verification and reverse rollback; successful transfer marks replay before Undo, and Undo never makes the capsule reusable.
+- [x] Added masked Shadow DOM presentation with keyboard/Escape support, reduced-motion behavior, and no raw booking reference or surname in the overlay DOM.
+- [x] Added aligned, lookalike, decoy, conflict, stale, nonempty, and reduced-motion judge scenarios plus packaged-extension activation limited to exact judge/test origins and allowlisted metadata.
+- [x] Added focused schema, extraction, policy, mapping, rollback, masking, activation, service, packaged-extension, and installed-Chrome regressions.
+- [x] Passed the final full release gate (104 unit/integration, 3 packaged-extension, and 12 installed-Chrome tests), companion clean-install smoke, archive integrity and secret-name scans, and a zero-vulnerability production audit.
+- [ ] Complete the focused branch commit, push, and review handoff without merging or publishing a release.
+
 ## 2026-07-20
 
 - [x] Read the full Build Week specification.

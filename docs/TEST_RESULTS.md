@@ -1,46 +1,28 @@
 # Test results
 
-Release candidate checked on 2026-07-21 in the local macOS workspace.
+The current beta.8 head plus Verified Context Capsules is being preflighted in a disposable integration worktree. The newest beta.8 hardening explicitly excludes Gmail Spam/Trash and limits Outlook retrieval to Inbox. After applying that commit, formatting, lint, types, all 119 unit/integration tests, all three builds, and all eight non-companion packaged interactions pass. Final artifacts will be rebuilt after the post-merge rebase. No integration artifact was published.
 
-| Check                         | Command                                                      | Result                                                 |
-| ----------------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
-| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 105 tests passed   |
-| Unit and integration          | `npm test`                                                   | 19 files, 105 tests passed                             |
-| Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built           |
-| Packaged MV3 acceptance       | `npm run test:extension`                                     | 8 Chromium tests passed                                |
-| Judge-browser acceptance      | `npm run test:browser`                                       | 7 Chromium tests passed                                |
-| Full release gate             | `npm run verify`                                             | Passed on the final beta.8 candidate                   |
-| Extension and companion build | `npm run package`                                            | Both beta.8 artifacts produced                         |
-| Companion clean install       | `npm run test:package`                                       | Setup, doctor, startup, and health smoke passed        |
-| Production dependency audit   | `npm audit --omit=dev --audit-level=moderate`                | 0 vulnerabilities                                      |
-| Extension archive integrity   | `unzip -t artifacts/contextfill-extension-v0.2.0-beta.8.zip` | No errors; options and Auto-Continue bundles included  |
-| Extension secret-name scan    | `rg` over `dist/extension`                                   | No API-key/OAuth-secret names found                    |
-| Public GitHub prerelease      | Release workflow and downloaded `v0.2.0-beta.8` assets       | Passed; public prerelease and all four assets verified |
+## Combined preflight checkpoint
 
-The packaged-extension acceptance suite proves that Assisted mode discovers and verifies an OTP without the popup but waits for in-page confirmation; a dynamically inserted SPA dialog triggers the same path; Auto-Continue fills an OTP after a visible countdown without clicking Submit and suppresses field animation under reduced-motion; an aligned magic link opens only the captured tab while a fresh lookalike blocks before navigation; cancellation prevents navigation; exact-origin revocation prevents future scanning; and privacy-safe history contains no candidate value. Separate packaged tests cover extension boot and the legacy explicit magic-link/reference path.
+| Check                                     | Result                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| Formatting, lint, types, unit/integration | 22 files / 119 tests passed after the latest mailbox hardening                         |
+| Production bundles                        | Demo, MV3 extension, and companion built after the latest mailbox hardening            |
+| Packaged browser interaction              | 8/8 Auto + Capsule + legacy link/reference scenarios passed after the latest hardening |
+| Installed-Chrome acceptance               | 12/12 passed at the prior checkpoint; final post-merge rerun required                  |
+| Package and companion clean install       | ZIP/TGZ and clean-install smoke passed at the prior checkpoint; final rebuild required |
+| Integrity, secret scan, audit             | Valid/empty/0-vulnerability at the prior checkpoint; final rebuild required            |
 
-The installed-Chrome suite covers aligned magic-link context, no navigation during inspection, link lookalike block, trusted reference fill, reference-domain lookalike block, single and split OTP filling, no automatic submission, service mismatch, expiry, sender warning, and unrelated-numeric empty state. Unit and integration coverage adds exact URL extraction, permanent display masking, unsafe scheme/credentials/IP/local/port/punycode/shortener/redirect rejection, destination mismatch, sender-conflict automatic blocking, expired and stale links, replay, competing messages, hidden/disabled decoys, explicit Gmail Spam/Trash exclusion, Outlook Inbox-only retrieval, model high-risk-action rejection, HTML-only Gmail anchor preservation, mixed code/link precedence, bounded token-free supporting excerpts, subject-level fallback-code masking, strict schema validation, model fallback, and real field mutation events.
+The separate companion-backed packaged load/pairing test is deferred only while the real beta.8 acceptance companion owns fixed port 4318; it passed on the beta.8 branch and must be repeated after the live handoff.
 
-The automated release gate uses injected provider/model responses and does not make paid OpenAI or external mailbox calls. Separately, a user-owned Gmail OAuth connection was completed with read-only scope and OS-keychain refresh persistence, and the connector retrieved bounded recent mail. In ChatGPT Atlas, the user then enabled Auto-Continue once for each exact site and completed two popup-free real-mail acceptance flows: Medium displayed the cancellable three-second overlay and opened the verified magic-login link in the same tab, while Substack displayed the same countdown and filled all six split OTP fields without ContextFill clicking Submit. Substack continued after the final digit according to its own page behavior. The user also observed the competing-message safeguard fail closed when multiple fresh Medium emails were eligible, then completed a clean retry after the ambiguity window. No acceptance record or public media exposes a real token, fallback code, address, or personal message.
+## Combined coverage
 
-## Current public release (beta.8)
+- Capsule: strict schema/evidence grounding, masking, expiry/replay, same-form mapping, hidden/ambiguous/sensitive/nonempty rejection, atomic rollback, truthful no-submit receipt, Undo, forged-loopback block, and model facts unable to bypass deterministic authorization.
+- Auto-Continue: exact-origin opt-in/revocation, Manual/Assisted/Auto modes, dynamic SPA detection, visible cancellable countdown, overlay-removal fail-closed, action-time revalidation, same-tab navigation, fresh lookalike block, privacy-safe history, explicit Gmail Spam/Trash exclusion, Outlook Inbox-only retrieval, and zero extension-initiated submissions.
+- Regression: legacy OTP, verified link, trusted reference, mailbox connectors, MIME import, pairing, doctor/setup, and deterministic no-key fallback.
 
-- URL: [ContextFill v0.2.0-beta.8](https://github.com/lzongren/contextfill/releases/tag/v0.2.0-beta.8)
-- Release state: public prerelease, built from merged `main` commit `8f1025007ef153b8b66c7449c4026201f73420f6`
-- Extension SHA-256: `b60e0bfcb4421a75acee3db713477ae4ae4d281a927cb653554d1d72a866fb66`
-- Companion SHA-256: `d70a614b49bafb997de8bae5050ce7a09cc4c08296708afb2366c808f90241d9`
-- Download verification: all four published assets were downloaded independently; both `.sha256` files passed, both archive structures were read successfully, and the embedded versions matched beta.8.
+## Publication state
 
-## Packaged extension
-
-- Path: `artifacts/contextfill-extension-v0.2.0-beta.8.zip`
-- Size: 284,476 bytes
-- Local SHA-256: `332b018430ee3cfc8f24ce7f9ab6a04046fa617d0cc90477acb1e76a42374a24`
-- ZIP contents: root-level manifest, popup/options HTML/CSS/JS, content script, and background worker
-
-## Packaged companion service
-
-- Path: `artifacts/contextfill-companion-v0.2.0-beta.8.tgz`
-- Size: 890,658 bytes
-- Local SHA-256: `9432975a350816595b21f3d37fbc575b74f067c5eb05616033ce341d0beea8e4`
-- Package contents: executable bundled service, source map, installation guide, environment template, package metadata, and license
+- PR #16 and PR #17 remain draft at this checkpoint.
+- No integration release or tag was created.
+- Final rebased artifact paths, sizes, hashes, and exact counts will replace this checkpoint after the post-merge gate.
