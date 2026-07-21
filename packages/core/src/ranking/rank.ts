@@ -11,7 +11,10 @@ export function rankCandidates(
 ): RankedCandidate[] {
   const now = options.now ?? new Date();
   return candidates
-    .filter((candidate) => candidate.type === 'otp' && candidate.value)
+    .filter(
+      (candidate) =>
+        Boolean(candidate.value) && ['otp', 'magic_link', 'reference'].includes(candidate.type),
+    )
     .map((candidate) => {
       const policy = evaluateTrust(candidate, page, options);
       const ageMinutes = Math.max(
@@ -21,6 +24,18 @@ export function rankCandidates(
       let score =
         policyWeight[policy.decision] + candidate.confidence * 20 - Math.min(ageMinutes, 60);
       const rationale: string[] = [];
+      if (candidate.type === 'otp' && ['single', 'split'].includes(page.fieldKind)) {
+        score += 25;
+        rationale.push('verification field matches the candidate type');
+      }
+      if (candidate.type === 'magic_link' && page.fieldKind === 'none') {
+        score += 25;
+        rationale.push('fieldless page matches a verified-link action');
+      }
+      if (candidate.type === 'reference' && page.fieldKind === 'reference') {
+        score += 25;
+        rationale.push('reference field matches the candidate type');
+      }
       if (candidate.referencedDomains.some((domain) => domainsAlign(page.hostname, domain))) {
         score += 30;
         rationale.push('message domain matches the requesting site');

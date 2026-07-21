@@ -1,7 +1,11 @@
+import { inspectMagicLink } from '../actions/links.js';
 import type { PageContext, PolicyResult, VerificationCandidate } from '../types.js';
 
 export type ConfirmationViewModel = {
+  candidateType: VerificationCandidate['type'];
+  candidateLabel: string;
   maskedValue: string;
+  destination: string | null;
   sender: string;
   subject: string;
   age: string;
@@ -11,6 +15,7 @@ export type ConfirmationViewModel = {
   statusLabel: string;
   explanation: string;
   canFill: boolean;
+  canOpen: boolean;
   canOverride: boolean;
   extractionLabel: string;
 };
@@ -39,8 +44,18 @@ export function buildConfirmationViewModel(
   page: PageContext,
   now = new Date(),
 ): ConfirmationViewModel {
+  const link =
+    candidate.type === 'magic_link' && candidate.value ? inspectMagicLink(candidate.value) : null;
   return {
-    maskedValue: maskCandidateValue(candidate.value),
+    candidateType: candidate.type,
+    candidateLabel:
+      candidate.type === 'magic_link'
+        ? 'Verified action link'
+        : candidate.type === 'reference'
+          ? 'Candidate reference'
+          : 'Candidate code',
+    maskedValue: link?.maskedUrl ?? maskCandidateValue(candidate.value),
+    destination: link?.hostname ?? null,
     sender: candidate.senderAddress
       ? `${candidate.senderName ?? 'Unknown sender'} <${candidate.senderAddress}>`
       : (candidate.senderName ?? 'Unknown sender'),
@@ -56,8 +71,10 @@ export function buildConfirmationViewModel(
           ? 'Needs caution'
           : 'Blocked',
     explanation: policy.reason,
-    canFill: policy.decision === 'allow',
-    canOverride: policy.decision === 'warn' && policy.canOverride,
+    canFill: candidate.type !== 'magic_link' && policy.decision === 'allow',
+    canOpen: candidate.type === 'magic_link' && policy.decision === 'allow',
+    canOverride:
+      candidate.type !== 'magic_link' && policy.decision === 'warn' && policy.canOverride,
     extractionLabel:
       candidate.extractionMethod === 'gpt-5.6'
         ? 'Extracted with GPT-5.6'

@@ -7,7 +7,7 @@ export const verificationCandidateSchema = z
     id: z.string().min(1).max(160),
     messageId: z.string().min(1).max(160),
     type: z.enum(['otp', 'magic_link', 'reference', 'unknown']),
-    value: z.string().trim().min(1).max(128).nullable(),
+    value: z.string().trim().min(1).max(2_048).nullable(),
     claimedService: nullableShortString,
     referencedDomains: z.array(z.string().trim().min(1).max(253)).max(12),
     senderName: nullableShortString,
@@ -19,7 +19,21 @@ export const verificationCandidateSchema = z
     supportingText: z.array(z.string().trim().min(1).max(300)).max(8),
     extractionMethod: z.enum(['gpt-5.6', 'deterministic']),
   })
-  .strict();
+  .strict()
+  .superRefine((candidate, context) => {
+    const maxLength =
+      candidate.type === 'magic_link' ? 2_048 : candidate.type === 'reference' ? 320 : 128;
+    if (candidate.value && candidate.value.length > maxLength) {
+      context.addIssue({
+        code: 'too_big',
+        maximum: maxLength,
+        origin: 'string',
+        inclusive: true,
+        path: ['value'],
+        message: `Candidate value must contain at most ${maxLength} characters.`,
+      });
+    }
+  });
 
 export type VerificationCandidate = z.infer<typeof verificationCandidateSchema>;
 
@@ -50,7 +64,7 @@ export const pageContextSchema = z
     serviceHint: z.string().max(120).nullable(),
     simulated: z.boolean(),
     scenario: z.string().max(120).nullable(),
-    fieldKind: z.enum(['single', 'split', 'none']),
+    fieldKind: z.enum(['single', 'split', 'reference', 'none']),
     fieldCount: z.number().int().min(0).max(12),
   })
   .strict();
@@ -73,6 +87,8 @@ export type PolicyResult = {
     | 'expired'
     | 'stale'
     | 'used'
+    | 'unsafe_link'
+    | 'destination_mismatch'
     | 'unsupported_candidate'
     | 'no_field';
   activeRegistrableDomain: string | null;

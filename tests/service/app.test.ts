@@ -128,4 +128,29 @@ describe('GPT structured-output validation', () => {
     } as unknown as ResponsesClient['responses'];
     await expect(extractWithGpt(message, { responses })).rejects.toThrow('not present');
   });
+
+  it('rejects model classification of a password-reset link even when copied verbatim', async () => {
+    const resetMessage = {
+      ...message,
+      id: 'password-reset',
+      subject: 'Reset your password',
+      body: 'Use this password reset link: https://account.northstar.test/reset/private-token.',
+    };
+    const responses = {
+      create: vi.fn(async () => ({
+        output_text: JSON.stringify({
+          type: 'magic_link',
+          value: 'https://account.northstar.test/reset/private-token',
+          claimedService: 'Northstar',
+          referencedDomains: ['account.northstar.test'],
+          expirationEvidence: null,
+          confidence: 0.99,
+          supportingText: ['password reset link'],
+        }),
+      })),
+    } as unknown as ResponsesClient['responses'];
+    await expect(extractWithGpt(resetMessage, { responses })).rejects.toThrow(
+      'unsupported or high-risk',
+    );
+  });
 });

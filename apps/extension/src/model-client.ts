@@ -64,7 +64,10 @@ export async function enhanceCandidatesWithModel(
     deterministicCandidates.map((candidate) => [candidate.messageId, candidate]),
   );
   for (const result of modelResults) {
-    if (result.candidate?.type === 'otp' && result.candidate.value) {
+    if (
+      result.candidate?.value &&
+      ['otp', 'magic_link', 'reference'].includes(result.candidate.type)
+    ) {
       byMessageId.set(result.candidate.messageId, result.candidate);
     }
   }

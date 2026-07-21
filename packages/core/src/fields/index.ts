@@ -1,11 +1,15 @@
 export type FieldTarget = {
-  kind: 'single' | 'split';
+  kind: 'single' | 'split' | 'reference';
   elements: HTMLInputElement[];
   score: number;
 };
 
 const codeWords =
-  /\b(verification|verify|one[- ]?time|otp|security|auth(?:entication)?|sign[- ]?in|login)\b/i;
+  /\b(verification|verify|one[- ]?time|otp|security|auth(?:entication)?|sign[- ]?in|login|access\s+code|confirmation\s+code|passcode)\b/i;
+const strongCodeWords =
+  /\b(verification(?:\s+code)?|one[- ]?time(?:\s+(?:access\s+)?code)?|otp|security\s+code|auth(?:entication)?\s+code|access\s+code|confirmation\s+code|passcode|two[- ]factor|2fa)\b/i;
+const referenceWords =
+  /\b((?:booking|reservation|application|support|case|ticket)\s+(?:reference|confirmation|number|id)|reference\s+(?:number|id))\b/i;
 
 function isVisibleAndEnabled(input: HTMLInputElement): boolean {
   if (input.disabled || input.readOnly || input.type === 'hidden' || input.hidden) return false;
@@ -22,6 +26,20 @@ function labelText(input: HTMLInputElement): string {
   return labels.join(' ');
 }
 
+function ancestorText(element: HTMLElement): string {
+  const context: string[] = [];
+  let current: HTMLElement | null = element.parentElement;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    context.push(
+      current.getAttribute('aria-label') ?? '',
+      current.getAttribute('aria-labelledby') ?? '',
+      current.textContent?.slice(0, 1_000) ?? '',
+    );
+    current = current.parentElement;
+  }
+  return context.join(' ');
+}
+
 function fieldText(input: HTMLInputElement): string {
   return [
     input.name,
@@ -29,8 +47,46 @@ function fieldText(input: HTMLInputElement): string {
     input.placeholder,
     input.getAttribute('aria-label') ?? '',
     labelText(input),
-    input.closest('fieldset, form, section')?.textContent?.slice(0, 500) ?? '',
+    ancestorText(input),
   ].join(' ');
+}
+
+function lowestCommonAncestor(inputs: HTMLInputElement[]): HTMLElement | null {
+  let ancestor = inputs[0]?.parentElement ?? null;
+  while (ancestor && !inputs.every((input) => ancestor!.contains(input))) {
+    ancestor = ancestor.parentElement;
+  }
+  return ancestor;
+}
+
+function splitContext(container: HTMLElement, inputs: HTMLInputElement[]): string {
+  const context: string[] = [];
+  let current: HTMLElement | null = container;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    context.push(
+      current.getAttribute('aria-label') ?? '',
+      current.getAttribute('aria-labelledby') ?? '',
+      current.textContent?.slice(0, 1_000) ?? '',
+    );
+    current = current.parentElement;
+  }
+  context.push(...inputs.map(fieldText));
+  return context.join(' ');
+}
+
+function isDigitBox(input: HTMLInputElement): boolean {
+  if (!isVisibleAndEnabled(input)) return false;
+  if (!['text', 'tel', 'number', 'password'].includes(input.type || 'text')) return false;
+  if (input.maxLength > 1) return false;
+  const pattern = input.getAttribute('pattern') ?? '';
+  return (
+    input.maxLength === 1 ||
+    input.inputMode === 'numeric' ||
+    input.type === 'tel' ||
+    input.type === 'number' ||
+    /\\d|0-9/.test(pattern) ||
+    /digit/i.test(`${input.name} ${input.id} ${input.getAttribute('aria-label') ?? ''}`)
+  );
 }
 
 export function scoreVerificationField(input: HTMLInputElement): number {
@@ -46,19 +102,29 @@ export function scoreVerificationField(input: HTMLInputElement): number {
   return score;
 }
 
+export function scoreReferenceField(input: HTMLInputElement): number {
+  if (!isVisibleAndEnabled(input)) return -Infinity;
+  if (!['text', 'search'].includes(input.type || 'text')) return -Infinity;
+  const text = fieldText(input);
+  let score = 0;
+  if (referenceWords.test(text)) score += 75;
+  if (
+    /\b(ref(?:erence)?|booking|reservation|application|support|case|ticket)\b/i.test(
+      `${input.name} ${input.id} ${input.getAttribute('aria-label') ?? ''}`,
+    )
+  ) {
+    score += 30;
+  }
+  if (input.maxLength >= 5 && input.maxLength <= 32) score += 10;
+  if (codeWords.test(text) && !referenceWords.test(text)) score -= 80;
+  return score;
+}
+
 function findSplitTarget(inputs: HTMLInputElement[]): FieldTarget | null {
-  const eligible = inputs.filter(
-    (input) =>
-      isVisibleAndEnabled(input) &&
-      input.maxLength === 1 &&
-      ['text', 'tel', 'number'].includes(input.type),
-  );
+  const eligible = inputs.filter(isDigitBox);
   if (eligible.length < 4 || eligible.length > 8) return null;
-  const container = eligible[0]?.closest('fieldset, form, section, [data-contextfill-split]');
-  if (!container || !eligible.every((input) => container.contains(input))) return null;
-  const context = `${container.textContent ?? ''} ${container.getAttribute('aria-label') ?? ''}`;
-  if (!codeWords.test(context) && !eligible.some((input) => codeWords.test(fieldText(input))))
-    return null;
+  const container = lowestCommonAncestor(eligible);
+  if (!container || !strongCodeWords.test(splitContext(container, eligible))) return null;
   return { kind: 'split', elements: eligible, score: 95 + eligible.length };
 }
 
@@ -78,6 +144,19 @@ export function findVerificationFields(document: Document): FieldTarget | null {
   return single;
 }
 
+export function findReferenceField(document: Document): FieldTarget | null {
+  const matches = [...document.querySelectorAll<HTMLInputElement>('input')]
+    .map((input) => ({ input, score: scoreReferenceField(input) }))
+    .filter(({ score }) => score >= 75)
+    .sort((a, b) => b.score - a.score);
+  const best = matches[0];
+  return best ? { kind: 'reference', elements: [best.input], score: best.score } : null;
+}
+
+export function findContextField(document: Document): FieldTarget | null {
+  return findVerificationFields(document) ?? findReferenceField(document);
+}
+
 function setInputValue(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
   descriptor?.set?.call(input, value);
@@ -87,10 +166,10 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-export function fillVerificationFields(target: FieldTarget, code: string): boolean {
-  if (!code || target.elements.some((element) => !isVisibleAndEnabled(element))) return false;
+export function fillTransferValue(target: FieldTarget, value: string): boolean {
+  if (!value || target.elements.some((element) => !isVisibleAndEnabled(element))) return false;
   if (target.kind === 'split') {
-    const characters = [...code];
+    const characters = [...value];
     if (characters.length !== target.elements.length) return false;
     target.elements.forEach((input, index) => setInputValue(input, characters[index] ?? ''));
     target.elements.at(-1)?.focus();
@@ -98,8 +177,10 @@ export function fillVerificationFields(target: FieldTarget, code: string): boole
   }
   const input = target.elements[0];
   if (!input) return false;
-  if (input.maxLength > 0 && code.length > input.maxLength) return false;
-  setInputValue(input, code);
+  if (input.maxLength > 0 && value.length > input.maxLength) return false;
+  setInputValue(input, value);
   input.focus();
   return true;
 }
+
+export const fillVerificationFields = fillTransferValue;

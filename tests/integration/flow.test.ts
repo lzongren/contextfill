@@ -3,6 +3,7 @@ import {
   applyExplicitFill,
   buildConfirmationViewModel,
   extractInboxDeterministic,
+  findContextField,
   findVerificationFields,
   messagesForScenario,
   rankCandidates,
@@ -72,5 +73,32 @@ describe('fixture-to-page flow', () => {
     expect(document.querySelector('input')?.value).toBe('');
     expect(applyExplicitFill(selected.policy, target, selected.candidate.value!, true)).toBe(true);
     expect(document.querySelector('input')?.value).toBe('773804');
+  });
+
+  it('transfers a trusted booking reference into only the labeled field and never submits', () => {
+    document.body.innerHTML = `<form><label>Booking reference<input name="bookingReference" maxlength="20" data-contextfill-visible="true"></label><label>Last name<input name="lastName" data-contextfill-visible="true"></label><button>Find trip</button></form>`;
+    const submit = vi.fn();
+    document.querySelector('form')?.addEventListener('submit', submit);
+    const target = findContextField(document)!;
+    const page: PageContext = {
+      ...basePage,
+      hostname: 'trips.cedartravel.test',
+      serviceHint: 'Cedar Travel',
+      scenario: 'reference',
+      fieldKind: 'reference',
+      fieldCount: 1,
+    };
+    const selected = rankCandidates(
+      extractInboxDeterministic(messagesForScenario('reference', now)),
+      page,
+      { now },
+    )[0]!;
+    expect(selected.policy.decision).toBe('allow');
+    expect(applyExplicitFill(selected.policy, target, selected.candidate.value!)).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('[name="bookingReference"]')?.value).toBe(
+      'CT-7K92Q',
+    );
+    expect(document.querySelector<HTMLInputElement>('[name="lastName"]')?.value).toBe('');
+    expect(submit).not.toHaveBeenCalled();
   });
 });

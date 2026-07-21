@@ -43,9 +43,57 @@ describe('deterministic extraction', () => {
     ).toMatchObject({ value: '654321', type: 'otp' });
   });
 
-  it('classifies a magic link without offering an OTP value', () => {
+  it('extracts the exact magic-login URL as an action candidate', () => {
     const magic = extractDeterministic(messages.find((message) => message.id === 'magic-link')!);
-    expect(magic).toMatchObject({ type: 'magic_link', value: null });
+    expect(magic).toMatchObject({
+      type: 'magic_link',
+      value: 'https://login.cedarnotes.test/magic/sample-token',
+    });
+  });
+
+  it('supports email confirmation but rejects high-risk recovery links', () => {
+    const base = {
+      source: 'gmail' as const,
+      senderName: 'Example',
+      senderAddress: 'hello@example.test',
+      receivedAt: now.toISOString(),
+      expiresAt: null,
+      serviceHint: 'Example',
+    };
+    expect(
+      extractDeterministic({
+        ...base,
+        id: 'confirm-email',
+        subject: 'Confirm your email',
+        body: 'Confirm your email at https://account.example.test/confirm/token-value.',
+      }),
+    ).toMatchObject({
+      type: 'magic_link',
+      value: 'https://account.example.test/confirm/token-value',
+    });
+    expect(
+      extractDeterministic({
+        ...base,
+        id: 'password-reset',
+        subject: 'Reset your password',
+        body: 'Use this password reset link: https://account.example.test/reset/token-value.',
+      }),
+    ).toBeNull();
+  });
+
+  it('extracts an explicit booking reference but not a generic order number', () => {
+    const reference = extractDeterministic(
+      messages.find((message) => message.id === 'booking-reference')!,
+    );
+    expect(reference).toMatchObject({
+      type: 'reference',
+      value: 'CT-7K92Q',
+      claimedService: 'Cedar Travel',
+      referencedDomains: ['trips.cedartravel.test'],
+    });
+    expect(
+      extractDeterministic(messages.find((message) => message.id === 'receipt-unrelated')!),
+    ).toBeNull();
   });
 
   it('extracts every supported fixture without throwing', () => {

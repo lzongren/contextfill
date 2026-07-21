@@ -70,6 +70,49 @@ test('ambiguous sender fixture warns and does not fill without override', async 
   await expect(page.locator('#verification-form')).toHaveAttribute('data-submit-count', '0');
 });
 
+test('magic-link fixtures allow aligned handoff context and block a lookalike without navigating', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=magic-link');
+  const before = page.url();
+  expect(await page.evaluate(() => window.contextFillHarness.inspect())).toMatchObject({
+    decision: 'allow',
+    reasonCode: 'aligned',
+    fieldKind: 'none',
+  });
+  expect(page.url()).toBe(before);
+
+  await page.goto('/?scenario=magic-link-lookalike');
+  expect(await page.evaluate(() => window.contextFillHarness.inspect())).toMatchObject({
+    decision: 'block',
+    reasonCode: 'lookalike',
+    fieldKind: 'none',
+  });
+  await expect(page.getByText('Waiting for your explicit email action')).toBeVisible();
+});
+
+test('trusted reference transfer fills only the matching field and blocks a lookalike site', async ({
+  page,
+}) => {
+  await page.goto('/?scenario=reference');
+  expect(await page.evaluate(() => window.contextFillHarness.inspect())).toMatchObject({
+    decision: 'allow',
+    reasonCode: 'aligned',
+    fieldKind: 'reference',
+  });
+  expect(await page.evaluate(() => window.contextFillHarness.fill())).toBe(true);
+  await expect(page.locator('#bookingReference')).toHaveValue('CT-7K92Q');
+  await expect(page.locator('#verification-form')).toHaveAttribute('data-submit-count', '0');
+
+  await page.goto('/?scenario=reference-lookalike');
+  expect(await page.evaluate(() => window.contextFillHarness.inspect())).toMatchObject({
+    decision: 'block',
+    reasonCode: 'lookalike',
+  });
+  expect(await page.evaluate(() => window.contextFillHarness.fill())).toBe(false);
+  await expect(page.locator('#bookingReference')).toHaveValue('');
+});
+
 declare global {
   interface Window {
     contextFillHarness: {

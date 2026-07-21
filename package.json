@@ -1,8 +1,8 @@
 {
   "name": "contextfill",
-  "version": "0.2.0-beta.6",
+  "version": "0.2.0-beta.7",
   "private": true,
-  "description": "Privacy-first verification-code transfer with deterministic message-to-site trust checks.",
+  "description": "Verified magic-link handoff with deterministic message, destination, and site trust checks.",
   "type": "module",
   "engines": {
     "node": ">=20"

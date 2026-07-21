@@ -203,6 +203,15 @@ input:focus-visible {
   letter-spacing: 0.12em;
 }
 
+.candidate-value--link {
+  max-width: 315px;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
 .text-button {
   padding: 5px 0;
   border: 0;

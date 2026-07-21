@@ -6,19 +6,19 @@ The extension popup and demo use small TypeScript DOM renderers. Their state is 
 
 ## D-002: Programmatic injection instead of permanent content-script matches
 
-The extension requests `activeTab` and `scripting`. It injects only after the user opens ContextFill and starts a scan. No `<all_urls>` host permission is requested.
+The extension requests `activeTab` and `scripting`. It injects only after the user opens ContextFill and starts a scan. Some Chromium pages require host permission even after popup activation, so optional HTTP(S) patterns are declared but receive no access by default. On a permission error, ContextFill derives one exact origin and asks the user before retrying.
 
 ## D-003: Model extracts facts; policy stays deterministic
 
-GPT-5.6 may classify a selected verification-like synthetic message and extract structured evidence. Zod validates the result. Domain alignment, expiry, replay, and allow/warn/block remain deterministic.
+GPT-5.6 may classify one selected temporary-action message and extract structured evidence. Zod validates the result. URL safety, domain alignment, expiry, replay, and allow/warn/block remain deterministic.
 
 ## D-004: Reserved-domain simulation is explicit
 
 Demo pages run on localhost and publish an explicit simulated hostname through page metadata. The popup labels it as a deterministic fixture; it never claims localhost is the represented domain.
 
-## D-005: A single fixed loopback host permission is justified
+## D-005: Fixed host permissions are limited to local product surfaces
 
-Chrome extension pages need host permission for cross-origin `fetch`. The manifest therefore grants only `http://127.0.0.1:4318/*` to reach the optional local extractor. Website access remains temporary through `activeTab`; there is no `<all_urls>` permission.
+Chrome extension pages need host permission for cross-origin `fetch`, and automated judge testing must inject into the fixed local lab without a browser permission prompt. The manifest therefore grants `http://127.0.0.1:4318/*` for the companion and `http://127.0.0.1:4173/*` for the judge lab. Real website access remains temporary through `activeTab` or an explicit exact-origin runtime grant.
 
 ## D-006: Replay identity is stable across extractors
 
@@ -34,7 +34,7 @@ Pull requests and pushes to `main` run formatting, lint, type, and unit/integrat
 
 ## D-009: Mailbox OAuth stays in a loopback companion service
 
-Gmail and Outlook use authorization code flow with PKCE through the existing Node.js companion service. Access tokens remain in memory; refresh tokens are stored through the native OS credential manager and automatically fall back to visible session-only behavior if that backend is unavailable. Provider APIs return a bounded recent-message set that is normalized to the shared mailbox schema before the existing extraction, ranking, deterministic policy, and explicit-fill pipeline.
+Gmail and Outlook use authorization code flow with PKCE through the existing Node.js companion service. Access tokens remain in memory; refresh tokens are stored through the native OS credential manager and automatically fall back to visible session-only behavior if that backend is unavailable. Provider APIs return a bounded recent-message set that is normalized to the shared mailbox schema before extraction, ranking, deterministic policy, and explicit action.
 
 Real mailbox messages use deterministic extraction by default. Model extraction is a separate explicit opt-in because configuring an OpenAI key must not silently cause personal message content to leave the device.
 
@@ -65,3 +65,19 @@ Setting the Microsoft authority to `common` lets a correctly registered applicat
 ## D-016: Gmail credentials import from Google's downloaded web-client JSON
 
 Copying a Gmail client secret into a command argument leaks it into shell history, while an ordinary prompt may echo it. ContextFill instead accepts Google's downloaded OAuth web-client JSON with `--setup gmail --credentials`. It rejects symlinks, non-files, files over 64 KB, malformed or non-web clients, invalid credential shapes, and registrations missing the exact runtime callback. Only the ID and secret are written to the owner-only `.env`; the command prints neither and immediately runs the non-secret readiness doctor. The user deletes Google's source JSON after import.
+
+## D-017: Verified Magic-Link Handoff is the differentiated core
+
+OTP fill remains useful but is already a crowded interaction. The public product story therefore starts with magic-login and email-confirmation links: ContextFill locates the action in a connected mailbox, explains why its sender, destination, and initiating page align, and opens it in the captured tab only after explicit approval. Trusted Reference Transfer is the secondary proof that the architecture is a general message-to-page action boundary rather than an OTP-specific feature.
+
+## D-018: One-time links are inspected without network activity
+
+A preflight request can consume a link or follow an attacker-controlled redirect. Link inspection therefore operates only on the URL string already present in the normalized message. It requires HTTPS and locally verifiable domain evidence, permanently masks token-bearing path/query/fragment data in the UI, and refuses credentials, IP/local hosts, nonstandard ports, internationalized hosts, shorteners, and opaque click/redirect endpoints. The extension performs no fetch, HEAD request, preconnect, prefetch, or redirect resolution.
+
+## D-019: Explicit navigation is bound to the scanned tab and URL
+
+The popup records the initiating tab ID and exact URL at scan time. The navigation controller rechecks both, records candidate use, clears sensitive state, and calls `chrome.tabs.update` with that same ID. Filling uses the same captured-tab check. A synthetic `.test` action maps only to the fixed localhost completion scenario and is visibly identified as simulation; real-mail links use the exact inspected destination.
+
+## D-020: Reference transfer is narrow and field-driven
+
+Generic numbers and order IDs create unacceptable false positives. Deterministic reference extraction is limited to explicit booking, reservation, application, support, case, or ticket-reference language; the page must expose a correspondingly labeled field. The same domain, service, sender, replay, and user-confirmation policy applies, with a documented 24-hour freshness window and no automatic submission.

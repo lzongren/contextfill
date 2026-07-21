@@ -1,3 +1,4 @@
+import { extractHttpUrls, isSupportedMagicLinkText } from '../actions/links.js';
 import { normalizeHostname } from '../domains/index.js';
 import {
   syntheticMessageSchema,
@@ -9,7 +10,12 @@ import {
 const verificationLanguage =
   /\b(verification|verify|one[- ]time|security code|sign[- ]?in code|login code|temporary code|authentication code|auth code|access code|confirmation code|passcode|two[- ]factor|2fa|otp)\b/i;
 const unrelatedLanguage = /\b(order|receipt|invoice|tracking|street|lane|customer care|phone)\b/i;
-const magicLinkLanguage = /\b(magic link|sign[- ]?in link|login link)\b/i;
+const magicLinkLanguage =
+  /\b(magic link|sign[- ]?in link|login link|email confirmation|confirm (?:your )?email|verify (?:your )?email|activate (?:your )?account|continue (?:to )?(?:sign[- ]?in|login))\b/i;
+const referenceLanguage =
+  /\b(booking|reservation|application|support|case|ticket)\s+(?:reference|confirmation|number|id)\b/i;
+const referenceAfterLanguage =
+  /\b(?:booking|reservation|application|support|case|ticket)\s+(?:reference|confirmation|number|id)\s*(?:is\s+|:\s*|#\s*)?([A-Z0-9][A-Z0-9-]{4,19})\b/i;
 const codeAfterLanguage =
   /(?:verification|one[- ]time|security|sign[- ]?in|login|temporary|authentication|auth|access|confirmation|two[- ]factor|2fa|otp)\s+(?:code|passcode)?\s*(?:is\s+|:\s*|#\s*)?([A-Z0-9]{4,10})\b/i;
 const plainCode = /\b([A-Z0-9]{6,8})\b/g;
@@ -51,6 +57,36 @@ function extractCode(text: string): string | null {
   return null;
 }
 
+function extractMagicLink(text: string): string | null {
+  const links = extractHttpUrls(text);
+  if (links.length === 0) return null;
+  return (
+    links
+      .map((link) => {
+        const index = text.indexOf(link);
+        const context = text.slice(Math.max(0, index - 180), index + link.length + 100);
+        let score = magicLinkLanguage.test(context) ? 20 : 0;
+        try {
+          const url = new URL(link);
+          if (/\b(magic|login|signin|sign-in|verify|confirm|activate)\b/i.test(url.pathname)) {
+            score += 8;
+          }
+        } catch {
+          score -= 20;
+        }
+        if (/\b(unsubscribe|privacy policy|manage preferences)\b/i.test(context)) score -= 40;
+        return { link, score };
+      })
+      .sort((a, b) => b.score - a.score)[0]?.link ?? null
+  );
+}
+
+function extractReference(text: string): string | null {
+  const value = text.match(referenceAfterLanguage)?.[1]?.toUpperCase() ?? null;
+  if (!value || /^\d+$/.test(value) || /^(?:19|20)\d{2}$/.test(value)) return null;
+  return value;
+}
+
 function excerptAround(text: string, needle: string | null): string[] {
   if (!needle) return [text.slice(0, 180)];
   const index = text.toUpperCase().indexOf(needle.toUpperCase());
@@ -62,7 +98,9 @@ export function isModelEligibleMessage(message: SyntheticMessage): boolean {
   const checked = syntheticMessageSchema.safeParse(message);
   if (!checked.success) return false;
   const text = `${message.subject}\n${message.body}`;
-  return verificationLanguage.test(text) || magicLinkLanguage.test(text);
+  return (
+    verificationLanguage.test(text) || magicLinkLanguage.test(text) || referenceLanguage.test(text)
+  );
 }
 
 export function extractDeterministic(messageInput: SyntheticMessage): VerificationCandidate | null {
@@ -73,18 +111,19 @@ export function extractDeterministic(messageInput: SyntheticMessage): Verificati
   const hasVerificationLanguage = verificationLanguage.test(text);
   const hasUnrelatedLanguage = unrelatedLanguage.test(text);
   const code = hasVerificationLanguage ? extractCode(text) : null;
-  const hasMagicLink = magicLinkLanguage.test(text) && /https?:\/\//i.test(message.body);
+  const magicLink = isSupportedMagicLinkText(text) ? extractMagicLink(message.body) : null;
+  const reference = referenceLanguage.test(text) ? extractReference(text) : null;
 
-  if (!code && !hasMagicLink) return null;
-  if (hasUnrelatedLanguage && !hasVerificationLanguage && !hasMagicLink) return null;
+  if (!code && !magicLink && !reference) return null;
+  if (hasUnrelatedLanguage && !hasVerificationLanguage && !magicLink && !reference) return null;
 
-  const type = code ? 'otp' : 'magic_link';
-  const confidence = code ? (codeAfterLanguage.test(text) ? 0.97 : 0.78) : 0.9;
+  const type = code ? 'otp' : magicLink ? 'magic_link' : 'reference';
+  const confidence = code ? (codeAfterLanguage.test(text) ? 0.97 : 0.78) : magicLink ? 0.9 : 0.94;
   return verificationCandidateSchema.parse({
     id: `candidate:${message.id}`,
     messageId: message.id,
     type,
-    value: code,
+    value: code ?? magicLink ?? reference,
     claimedService: inferService(message),
     referencedDomains: findDomains(message),
     senderName: message.senderName,
@@ -93,7 +132,7 @@ export function extractDeterministic(messageInput: SyntheticMessage): Verificati
     receivedAt: message.receivedAt,
     expiresAt: message.expiresAt,
     confidence,
-    supportingText: excerptAround(message.body, code),
+    supportingText: excerptAround(message.body, code ?? magicLink ?? reference),
     extractionMethod: 'deterministic',
   });
 }
