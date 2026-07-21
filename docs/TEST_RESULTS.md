@@ -21,7 +21,7 @@ The packaged-extension acceptance suite proves that Assisted mode discovers and 
 
 The installed-Chrome suite covers aligned magic-link context, no navigation during inspection, link lookalike block, trusted reference fill, reference-domain lookalike block, single and split OTP filling, no automatic submission, service mismatch, expiry, sender warning, and unrelated-numeric empty state. Unit and integration coverage adds exact URL extraction, permanent display masking, unsafe scheme/credentials/IP/local/port/punycode/shortener/redirect rejection, destination mismatch, sender-conflict automatic blocking, expired and stale links, replay, competing messages, hidden/disabled decoys, explicit Gmail Spam/Trash exclusion, Outlook Inbox-only retrieval, model high-risk-action rejection, HTML-only Gmail anchor preservation, mixed code/link precedence, bounded token-free supporting excerpts, subject-level fallback-code masking, strict schema validation, model fallback, and real field mutation events.
 
-The automated release gate uses injected provider/model responses and does not make paid OpenAI or external mailbox calls. Separately, a user-owned Gmail OAuth connection was completed with read-only scope and OS-keychain refresh persistence, the connector retrieved bounded recent mail, and the user confirmed both a real Gmail-to-Vialto OTP fill and a real Gmail-to-Medium magic-link handoff in ChatGPT Atlas under the prior Manual flow. Fresh real-site Auto-Continue acceptance is required before beta.8 publication. No public media should expose a real token, fallback code, address, or personal message.
+The automated release gate uses injected provider/model responses and does not make paid OpenAI or external mailbox calls. Separately, a user-owned Gmail OAuth connection was completed with read-only scope and OS-keychain refresh persistence, and the connector retrieved bounded recent mail. In ChatGPT Atlas, the user then enabled Auto-Continue once for each exact site and completed two popup-free real-mail acceptance flows: Medium displayed the cancellable three-second overlay and opened the verified magic-login link in the same tab, while Substack displayed the same countdown and filled all six split OTP fields without ContextFill clicking Submit. Substack continued after the final digit according to its own page behavior. The user also observed the competing-message safeguard fail closed when multiple fresh Medium emails were eligible, then completed a clean retry after the ambiguity window. No acceptance record or public media exposes a real token, fallback code, address, or personal message.
 
 ## Current public release (beta.7)
 
@@ -35,7 +35,7 @@ The automated release gate uses injected provider/model responses and does not m
 
 - Path: `artifacts/contextfill-extension-v0.2.0-beta.8.zip`
 - Size: 284,476 bytes
-- Local SHA-256: `306c2c906aa1e2ec14ebba21c50fd90bd8a0c080ea602d7c7c48052142aa9a7d`
+- Local SHA-256: `332b018430ee3cfc8f24ce7f9ab6a04046fa617d0cc90477acb1e76a42374a24`
 - ZIP contents: root-level manifest, popup/options HTML/CSS/JS, content script, and background worker
 
 ## Packaged companion service

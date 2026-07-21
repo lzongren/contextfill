@@ -48,7 +48,7 @@
 - [x] Added dynamic SPA wait-state detection, hidden/disabled decoy rejection, competing-message fail-closed selection, page-removed countdown cancellation, reduced-motion support, and exact-origin revocation.
 - [x] Added privacy-preserving local activity history with a strict secret-free schema, 24-record cap, seven-day TTL, clear control, and trusted-site management page.
 - [x] Passed the pre-release Auto-Continue gate: formatting/lint/types, 105 unit/integration tests, three production builds, eight packaged-extension scenarios, and seven judge-browser regressions.
-- [ ] Complete fresh real Gmail acceptance in Auto mode on one OTP site and Medium magic-link login; record outcome without exposing a code or token.
+- [x] Completed fresh real Gmail acceptance in Auto mode: Medium opened a verified magic-login link in the same tab and Substack filled a split OTP after the visible cancellable countdown, without reopening the extension after each exact-site opt-in or exposing a code/token.
 - [ ] Package, publish, and independently download/verify the `v0.2.0-beta.8` public prerelease after the final real-flow acceptance.
 - [ ] Complete a live Outlook connection when an Entra app registration is available; this is not required for the Gmail-backed release.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.
