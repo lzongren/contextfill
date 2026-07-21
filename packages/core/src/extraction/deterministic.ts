@@ -6,6 +6,7 @@ import {
   type SyntheticMessage,
   type VerificationCandidate,
 } from '../types.js';
+import { verifiedMailboxSenderAddress } from '../policy/sender.js';
 
 const verificationLanguage =
   /\b(verification|verify|one[- ]time|security code|sign[- ]?in code|login code|temporary code|authentication code|auth code|access code|confirmation code|passcode|two[- ]factor|2fa|otp)\b/i;
@@ -141,7 +142,7 @@ export function extractDeterministic(messageInput: SyntheticMessage): Verificati
     claimedService: inferService(message),
     referencedDomains: findDomains(message),
     senderName: message.senderName,
-    senderAddress: message.senderAddress,
+    senderAddress: verifiedMailboxSenderAddress(message),
     subject: message.subject,
     receivedAt: message.receivedAt,
     expiresAt: message.expiresAt,

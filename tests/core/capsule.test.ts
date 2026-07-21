@@ -5,6 +5,7 @@ import {
   createContextCapsuleFromModelFacts,
   extractContextCapsuleDeterministic,
   extractContextCapsulesDeterministic,
+  extractDeterministic,
   hasConflictingTravelCapsules,
   makeCapsuleInbox,
   maskContextCapsuleFact,
@@ -34,6 +35,10 @@ const easyJetMessage = {
   receivedAt: '2024-08-10T12:00:00.000Z',
   expiresAt: null,
   serviceHint: 'easyJet',
+};
+const easyJetMessageWithSurname = {
+  ...easyJetMessage,
+  body: 'Hi, Sample; passenger surname: Rivera; here are details for your booking EZ7TEST. Manage it at https://www.easyjet.com/en.',
 };
 const easyJetPage: CapsulePageContext = {
   hostname: 'www.easyjet.com',
@@ -119,11 +124,20 @@ describe('context capsule schema and extraction', () => {
     expect(hasConflictingTravelCapsules([capsules[0]!])).toBe(false);
   });
 
-  it('extracts an easyJet surname from the bounded confirmation greeting', () => {
-    const capsule = extractContextCapsuleDeterministic(easyJetMessage, now)!;
+  it('does not mistake an easyJet greeting name for the passenger surname', () => {
+    expect(extractContextCapsuleDeterministic(easyJetMessage, now)).toBeNull();
+    expect(extractDeterministic(easyJetMessage)).toMatchObject({
+      type: 'reference',
+      value: 'EZ7TEST',
+      senderAddress: 'confirmation@easyjet.com',
+    });
+  });
+
+  it('extracts an easyJet capsule only when the message explicitly states the surname', () => {
+    const capsule = extractContextCapsuleDeterministic(easyJetMessageWithSurname, now)!;
     expect(capsule.facts).toEqual([
       expect.objectContaining({ key: 'booking_reference', value: 'EZ7TEST' }),
-      expect.objectContaining({ key: 'passenger_surname', value: 'Sample' }),
+      expect.objectContaining({ key: 'passenger_surname', value: 'Rivera' }),
     ]);
   });
 });
@@ -168,9 +182,9 @@ describe('context capsule trust authorization', () => {
   });
 
   it('accepts only an Apple relay address that encodes the easyJet sender domain', () => {
-    const capsule = extractContextCapsuleDeterministic(easyJetMessage, now)!;
+    const capsule = extractContextCapsuleDeterministic(easyJetMessageWithSurname, now)!;
     expect(
-      authorizeContextCapsule(capsule, easyJetMessage, easyJetPage, {
+      authorizeContextCapsule(capsule, easyJetMessageWithSurname, easyJetPage, {
         now,
         maxMessageAgeMinutes: 5 * 365 * 24 * 60,
       }),
@@ -179,7 +193,7 @@ describe('context capsule trust authorization', () => {
       authorizeContextCapsule(
         capsule,
         {
-          ...easyJetMessage,
+          ...easyJetMessageWithSurname,
           senderAddress: 'private_alias_at_attacker_com_random@icloud.com',
         },
         easyJetPage,

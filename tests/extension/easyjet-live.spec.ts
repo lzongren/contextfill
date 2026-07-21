@@ -38,11 +38,16 @@ async function bestEffortUndo(page: Page | null): Promise<void> {
         'button.primary, button.secondary',
       );
       if (button?.textContent?.includes('Undo')) button.click();
+      for (const input of document.querySelectorAll<HTMLInputElement>(
+        'input[placeholder="Surname(s)"], input[placeholder="Booking reference"]',
+      )) {
+        input.value = '';
+      }
     })
     .catch(() => undefined);
 }
 
-test('private Gmail confirmation transfers into the current easyJet DOM contract and undoes', async () => {
+test('private Gmail confirmation fills only the evidenced easyJet reference when surname is absent', async () => {
   test.setTimeout(120_000);
   const extensionPath = resolve('dist/extension');
   let context: BrowserContext | null = null;
@@ -115,31 +120,22 @@ test('private Gmail confirmation transfers into the current easyJet DOM contract
     );
     const popup = await popupPromise;
     console.log('live-stage: read-gmail');
-    await expect(popup.getByRole('heading', { name: /Choose (?:this |a )?booking/ })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      popup.getByRole('heading', { name: /Choose (?:this |a )?booking reference/ }),
+    ).toBeVisible({ timeout: 15_000 });
     const firstChoice = popup.locator('.capsule-choice').first();
     await expect(firstChoice).toBeVisible();
-    await expect(firstChoice.locator('.capsule-choice__heading strong')).toContainText('••');
-    await expect(firstChoice.locator('code')).toHaveCount(2);
+    await expect(firstChoice.locator('code')).toHaveCount(1);
     for (const maskedFact of await firstChoice.locator('code').allTextContents()) {
       expect(maskedFact).toContain('•');
     }
     console.log('live-stage: choose-masked-booking');
-    const popupClosed = popup.waitForEvent('close', { timeout: 10_000 });
-    await firstChoice.getByRole('button', { name: 'Review verified transfer' }).click();
-    await popupClosed;
-
-    console.log('live-stage: wait-for-overlay');
-    const overlay = easyJetPage.locator('#contextfill-capsule-host');
-    await expect(overlay).toBeAttached({ timeout: 15_000 });
-    const transfer = overlay.getByRole('button', { name: 'Transfer 2 verified facts' });
-    await expect(transfer).toBeEnabled({ timeout: 10_000 });
-    await transfer.click();
+    await firstChoice.getByRole('button', { name: 'Review reference-only transfer' }).click();
+    await expect(popup.getByText(/does not state a passenger surname/i)).toBeVisible();
+    await popup.getByRole('button', { name: 'Fill reference' }).click();
     console.log('live-stage: transferred');
-    await expect(overlay.getByRole('status')).toContainText(
-      '2 verified facts transferred. Form not submitted.',
-    );
+    await expect(popup.getByRole('heading', { name: 'Reference filled' })).toBeVisible();
+    await expect(popup.getByText(/enter it yourself/i)).toBeVisible();
 
     const transferState = await easyJetPage.evaluate(() => ({
       surnamePresent: Boolean(
@@ -154,27 +150,11 @@ test('private Gmail confirmation transfers into the current easyJet DOM contract
       submits: window.__contextfillLiveSubmitCount ?? 0,
     }));
     expect(transferState).toEqual({
-      surnamePresent: true,
+      surnamePresent: false,
       bookingPresent: true,
       consentChecked: false,
       submits: 0,
     });
-
-    await overlay.getByRole('button', { name: 'Undo entire handoff' }).click();
-    console.log('live-stage: undo');
-    await expect(overlay.getByRole('status')).toContainText(
-      'Transfer undone. Both original field values were restored.',
-    );
-    const undoState = await easyJetPage.evaluate(() => ({
-      surnameEmpty:
-        document.querySelector<HTMLInputElement>('input[placeholder="Surname(s)"]')?.value === '',
-      bookingEmpty:
-        document.querySelector<HTMLInputElement>('input[placeholder="Booking reference"]')
-          ?.value === '',
-      submits: window.__contextfillLiveSubmitCount ?? 0,
-    }));
-    expect(undoState).toEqual({ surnameEmpty: true, bookingEmpty: true, submits: 0 });
-    await expect(overlay.getByRole('button', { name: 'Undo entire handoff' })).toBeDisabled();
   } finally {
     console.log('live-stage: cleanup');
     await bestEffortUndo(easyJetPage);
