@@ -112,6 +112,13 @@ describe('local extraction service', () => {
     });
     expect(allowed.status).toBe(200);
     expect(await allowed.json()).toEqual({ messages: [message] });
+    expect(mailbox.listMessages).toHaveBeenCalledWith('gmail', 'temporary_action');
+
+    const easyJet = await app.request('/mail/messages/gmail?purpose=easyjet_booking_lookup', {
+      headers: { origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
+    });
+    expect(easyJet.status).toBe(200);
+    expect(mailbox.listMessages).toHaveBeenLastCalledWith('gmail', 'easyjet_booking_lookup');
 
     const otherExtension = await app.request('/mail/messages/gmail', {
       headers: { origin: 'chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba' },

@@ -8,6 +8,7 @@ import type { PageContext } from '../../../packages/core/src/types.js';
 import { AutoContinueOverlay } from './auto-continue-overlay.js';
 import type { BackgroundRequest } from './shared/messages.js';
 import type { ContentRequest, ContentResponse } from './shared/messages.js';
+import { isAllowedEasyJetBookingPage } from './easyjet-policy.js';
 
 const overlay = new AutoContinueOverlay(document);
 
@@ -21,7 +22,11 @@ function scanPage(): PageContext {
   const simulatedHostname = isLoopback ? fixtureMeta('contextfill-simulated-host') : null;
   return {
     hostname: simulatedHostname ?? window.location.hostname,
-    serviceHint: isLoopback ? fixtureMeta('contextfill-service') : null,
+    serviceHint: isLoopback
+      ? fixtureMeta('contextfill-service')
+      : isAllowedEasyJetBookingPage(window.location.href)
+        ? 'easyJet'
+        : null,
     simulated: Boolean(simulatedHostname),
     scenario: isLoopback ? fixtureMeta('contextfill-scenario') : null,
     fieldKind: target?.kind ?? 'none',
@@ -60,7 +65,7 @@ function sendOverlayAction(action: 'execute' | 'cancel' | 'dismiss' | 'retry'): 
   void chrome.runtime.sendMessage(request).catch(() => undefined);
 }
 
-function handleRequest(request: ContentRequest): ContentResponse {
+function handleRequest(request: ContentRequest): ContentResponse | null {
   if (request.type === 'SCAN_CONTEXT') {
     const target = findContextField(document);
     return {
@@ -93,13 +98,15 @@ function handleRequest(request: ContentRequest): ContentResponse {
     overlay.destroy();
     return { ok: true };
   }
-  return { ok: false, error: 'Unsupported request.' };
+  return null;
 }
 
 if (!window.__contextfillContentInstalled) {
   window.__contextfillContentInstalled = true;
   chrome.runtime.onMessage.addListener((request: ContentRequest, _sender, sendResponse) => {
-    sendResponse(handleRequest(request));
+    const response = handleRequest(request);
+    if (!response) return false;
+    sendResponse(response);
     return false;
   });
   let lastAutomaticSignal = detectAutomaticPageSignal(document).intents.join('|');

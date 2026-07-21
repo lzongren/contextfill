@@ -90,7 +90,9 @@ export function mountContextCapsuleOverlay(
     document,
     'p',
     'lede',
-    'A temporary, origin-bound handoff from one synthetic booking message.',
+    `A temporary, origin-bound handoff from one ${
+      options.sourceLabel?.toLocaleLowerCase().includes('gmail') ? 'Gmail' : 'synthetic'
+    } booking message.`,
   );
 
   const chain = element(document, 'div', 'chain');

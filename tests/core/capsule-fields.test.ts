@@ -56,6 +56,28 @@ describe('capsule field mapping and transaction', () => {
     expect(executeContextCapsuleTransfer(capsule, policy, plan, used)).toBeNull();
   });
 
+  it('maps the current easyJet Find Booking labels without touching its consent checkbox or submit', () => {
+    document.body.innerHTML = `<form action="https://www.easyjet.com/en?accntmdl=2">
+      <input type="text" aria-label="Please enter a valid surname to find your booking" placeholder="Surname(s)" data-contextfill-visible="true">
+      <input type="text" aria-label="Please enter a valid booking reference to find your booking" placeholder="Booking reference" data-contextfill-visible="true">
+      <input id="consent" type="checkbox" aria-label="Confirm permission to manage this booking" data-contextfill-visible="true">
+      <button type="submit">Find Booking</button>
+    </form>`;
+    const form = document.querySelector('form')!;
+    const submitted = vi.fn();
+    form.addEventListener('submit', submitted);
+    const policy = authorizeContextCapsule(capsule, message, page, { now });
+    const plan = createCapsuleMappingPlan(document, capsule);
+    expect(plan).toMatchObject({ decision: 'ready', reasonCode: 'mapped' });
+    const receipt = executeContextCapsuleTransfer(capsule, policy, plan)!;
+    const textInputs = [...document.querySelectorAll<HTMLInputElement>('input[type="text"]')];
+    expect(textInputs.map((input) => input.value)).toEqual(['Rivera', 'AU-47K2']);
+    expect(document.querySelector<HTMLInputElement>('#consent')?.checked).toBe(false);
+    expect(submitted).not.toHaveBeenCalled();
+    expect(receipt.undo()).toBe(true);
+    expect(textInputs.map((input) => input.value)).toEqual(['', '']);
+  });
+
   it('ignores a hidden decoy and refuses ambiguous, sensitive, or non-empty targets', () => {
     renderFields('<label hidden>Booking reference<input name="hiddenBooking" hidden></label>');
     expect(createCapsuleMappingPlan(document, capsule).decision).toBe('ready');

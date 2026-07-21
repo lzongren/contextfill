@@ -1,12 +1,18 @@
 import {
   buildConfirmationViewModel,
+  authorizeContextCapsule,
+  capsulePageContextSchema,
+  extractContextCapsulesDeterministic,
   extractInboxDeterministic,
+  maskContextCapsuleFact,
+  maskContextCapsuleText,
   messagesForScenario,
   pageContextSchema,
   rankCandidates,
   type PageContext,
   type RankedCandidate,
   type MailboxMessage,
+  type ContextCapsule,
 } from '../../../packages/core/src/index.js';
 import { EmlImportError, parseEmlImport } from './eml-import.js';
 import type { AutomationMode, AutomationSiteRule } from './automation-settings.js';
@@ -39,6 +45,7 @@ import type {
 } from './shared/messages.js';
 import { isMissingHostPermission, siteAccessRequest } from './site-access.js';
 import { performVerifiedNavigation } from './verified-navigation.js';
+import { EASYJET_MAX_MESSAGE_AGE_MINUTES, isAllowedEasyJetBookingPage } from './easyjet-policy.js';
 
 const app = document.querySelector<HTMLElement>('#app')!;
 const mailboxSetupGuide =
@@ -55,6 +62,11 @@ let persistedMailSource: PersistentMailSource = 'synthetic';
 let importedMessages: MailboxMessage[] = [];
 let realMailModelOptIn = false;
 let viewGeneration = 0;
+
+type EasyJetChoice = {
+  capsule: ContextCapsule;
+  message: MailboxMessage;
+};
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -855,6 +867,132 @@ async function fillSelected(warningOverride: boolean): Promise<void> {
   }
 }
 
+async function openEasyJetChoice(tabId: number, choice: EasyJetChoice): Promise<void> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!isAllowedEasyJetBookingPage(tab.url)) {
+      throw new Error('The initiating tab is no longer the approved easyJet booking page.');
+    }
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['easyjet-content.js'] });
+    const response = await contentMessage(tabId, {
+      type: 'SHOW_EASYJET_CAPSULE',
+      capsule: choice.capsule,
+      message: choice.message,
+    });
+    if (!response.ok || !response.capsuleShown) {
+      throw new Error(response.ok ? 'The capsule overlay was not confirmed.' : response.error);
+    }
+    clearSensitiveState('success');
+    window.close();
+  } catch (error) {
+    renderMessage(
+      'error',
+      'Could not open the easyJet capsule',
+      error instanceof Error ? error.message : 'The page changed before review.',
+    );
+  }
+}
+
+async function renderEasyJetChoices(
+  messages: MailboxMessage[],
+  tabId: number,
+  page: PageContext,
+): Promise<void> {
+  const now = new Date();
+  const capsulePage = capsulePageContextSchema.parse({
+    hostname: page.hostname,
+    serviceHint: 'easyJet',
+    simulated: false,
+    scenario: null,
+  });
+  const usedResponse = await backgroundMessage({ type: 'GET_USED_CANDIDATES' });
+  const usedCapsuleIds = new Set(usedResponse.ok ? usedResponse.candidateIds : []);
+  const capsules = extractContextCapsulesDeterministic(messages, now);
+  const evaluated = capsules.flatMap(
+    (
+      capsule,
+    ): Array<{
+      choice: EasyJetChoice;
+      decision: ReturnType<typeof authorizeContextCapsule>;
+    }> => {
+      const message = messages.find((candidate) => candidate.id === capsule.messageId);
+      if (!message) return [];
+      return [
+        {
+          choice: { capsule, message },
+          decision: authorizeContextCapsule(capsule, message, capsulePage, {
+            now,
+            usedCapsuleIds,
+            maxMessageAgeMinutes: EASYJET_MAX_MESSAGE_AGE_MINUTES,
+          }),
+        },
+      ];
+    },
+  );
+  const allowed = evaluated.filter((item) => item.decision.decision === 'allow');
+  if (allowed.length === 0) {
+    const explanation =
+      evaluated[0]?.decision.reason ??
+      'No easyJet confirmation contained both a booking reference and passenger surname with matching sender and domain evidence.';
+    renderMessage('empty', 'No verified easyJet booking found', explanation);
+    return;
+  }
+
+  selected = null;
+  const { body } = shell();
+  body.append(
+    element('p', 'kicker', 'Gmail → easyJet'),
+    element('h1', '', allowed.length === 1 ? 'Choose this booking' : 'Choose a booking'),
+    element(
+      'p',
+      'muted',
+      allowed.length === 1
+        ? 'ContextFill found one confirmation that matches this official easyJet booking page.'
+        : 'ContextFill found several matching confirmations. It will not choose between different bookings automatically.',
+    ),
+  );
+  const list = element('div', 'capsule-choice-list');
+  for (const { choice } of allowed) {
+    const card = element('article', 'capsule-choice');
+    const heading = element('div', 'capsule-choice__heading');
+    heading.append(
+      element('strong', '', maskContextCapsuleText(choice.message.subject, choice.capsule)),
+      element('span', 'source-status', choice.message.receivedAt.slice(0, 10)),
+    );
+    const sender = element(
+      'p',
+      'muted capsule-choice__sender',
+      choice.message.senderRelay ? 'easyJet · verified Apple Hide My Email relay' : 'easyJet',
+    );
+    const facts = element('div', 'capsule-choice__facts');
+    for (const fact of choice.capsule.facts) {
+      const chip = element('span', 'capsule-choice__fact');
+      chip.append(
+        element(
+          'b',
+          '',
+          fact.key === 'booking_reference' ? 'Booking reference' : 'Passenger surname',
+        ),
+        element('code', '', maskContextCapsuleFact(fact)),
+      );
+      facts.append(chip);
+    }
+    const use = element('button', 'button button--primary', 'Review verified transfer');
+    use.type = 'button';
+    use.addEventListener('click', () => void openEasyJetChoice(tabId, choice));
+    card.append(heading, sender, facts, use);
+    list.append(card);
+  }
+  body.append(
+    list,
+    element(
+      'p',
+      'extraction-note',
+      'Deterministic extraction · exact easyJet origin · values stay masked until transfer · never submits',
+    ),
+  );
+}
+
 async function scan(): Promise<void> {
   const generation = ++viewGeneration;
   renderLoading();
@@ -866,12 +1004,20 @@ async function scan(): Promise<void> {
     if (!response.ok || !response.page)
       throw new Error(response.ok ? 'Page context was unavailable.' : response.error);
     const page = pageContextSchema.parse(response.page);
+    const easyJetLive = mailSource === 'gmail' && isAllowedEasyJetBookingPage(tab.url);
     const messages =
       mailSource === 'synthetic'
         ? messagesForScenario(page.scenario)
         : mailSource === 'import'
           ? importedMessages
-          : await fetchMailboxMessages(mailSource);
+          : await fetchMailboxMessages(
+              mailSource,
+              easyJetLive ? 'easyjet_booking_lookup' : 'temporary_action',
+            );
+    if (easyJetLive) {
+      await renderEasyJetChoices(messages, tab.id!, page);
+      return;
+    }
     const deterministic = extractInboxDeterministic(messages);
     if (mailSource === 'import') importedMessages = [];
     const enhanced = shouldUseModelForSource(mailSource, realMailModelOptIn)
