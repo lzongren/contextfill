@@ -15,12 +15,21 @@ Release candidate checked on 2026-07-21 in the local macOS workspace.
 | Production dependency audit   | `npm audit --omit=dev --audit-level=moderate`                | 0 vulnerabilities                                   |
 | Extension archive integrity   | `unzip -t artifacts/contextfill-extension-v0.2.0-beta.7.zip` | No errors                                           |
 | Extension secret-name scan    | `rg` over `dist/extension`                                   | No API-key/OAuth-secret names found                 |
+| Public GitHub prerelease      | Release workflow and downloaded `v0.2.0-beta.7` assets       | Published; both checksums and archives verified     |
 
 The packaged-extension acceptance suite proves that an aligned magic link remains inert and token-masked until explicit approval, then navigates only the captured initiating tab to the honest synthetic completion fixture. It immediately blocks replay. The same installed extension then fills only the explicitly labeled booking-reference field and leaves submit count at zero. The second packaged test covers extension boot, message-source UI, one-time companion pairing, and Gmail/Outlook setup guidance.
 
 The installed-Chrome suite covers aligned magic-link context, no navigation during inspection, link lookalike block, trusted reference fill, reference-domain lookalike block, single and split OTP filling, no automatic submission, service mismatch, expiry, sender warning, and unrelated-numeric empty state. Unit and integration coverage adds exact URL extraction, permanent display masking, unsafe scheme/credentials/IP/local/port/punycode/shortener/redirect rejection, destination mismatch, sender conflict, expiry/staleness, replay, model high-risk-action rejection, HTML-only Gmail anchor preservation, mixed code/link precedence, bounded token-free supporting excerpts, subject-level fallback-code masking, strict schema validation, model fallback, and real field mutation events.
 
 The automated release gate uses injected provider/model responses and does not make paid OpenAI or external mailbox calls. Separately, a user-owned Gmail OAuth connection was completed with read-only scope and OS-keychain refresh persistence, the connector retrieved bounded recent mail, and the user confirmed both a real Gmail-to-Vialto OTP fill and a real Gmail-to-Medium magic-link handoff in ChatGPT Atlas. For the Medium flow, ContextFill inspected the URL locally, displayed a masked destination and aligned sender/page/destination evidence, remained inert until explicit approval, and then opened the exact link in the initiating Medium tab, which completed sign-in. No public media should expose a real token, fallback code, address, or personal message.
+
+## Public release
+
+- URL: [ContextFill v0.2.0-beta.7](https://github.com/lzongren/contextfill/releases/tag/v0.2.0-beta.7)
+- Release state: public prerelease, built from `e503c6d7e2384ceaf35bb4fd38ea6db963bb57c4`
+- Extension SHA-256: `642861199b27b8043f3e5eedf8da84bba88b13e1ac5488f90f32bc6f432136d4`
+- Companion SHA-256: `a11848e3cd7a0a5896beb51e84550bc4db722e5654f8529d12908780537d6912`
+- Download verification: both published `.sha256` files passed; the ZIP and TGZ structures were read successfully.
 
 ## Packaged extension
 
