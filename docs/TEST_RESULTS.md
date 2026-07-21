@@ -1,6 +1,6 @@
 # Test results
 
-The isolated Verified Context Capsules branch was checked on 2026-07-21 in the local macOS workspace. These artifacts are branch evidence only; no new release was published.
+The integrated `codex/wow-experiment` branch was independently checked on 2026-07-21 in the local macOS workspace after the Capsule commit was cherry-picked. These artifacts are branch evidence only; no new release was published.
 
 | Check                         | Command                                                      | Result                                                                       |
 | ----------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
@@ -35,7 +35,7 @@ The automated release gate uses injected provider/model responses and does not m
 
 - Path: `artifacts/contextfill-extension-v0.2.0-beta.7.zip`
 - Size: 275,222 bytes
-- SHA-256: `5eb92b5e604de8218c65d489860fcf00a62414385ce7dccaa54b0610497f5773`
+- SHA-256: `affa702d2bf4bd1c8397a380c6f3de3bb33af523f63c34c349bf3f665cac6dd3`
 - ZIP contents: root-level `manifest.json`, popup HTML/CSS/JS, capsule and general content scripts, and background worker
 - Publication state: isolated branch artifact only; not uploaded or released
 
