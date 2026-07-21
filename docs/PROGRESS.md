@@ -38,7 +38,7 @@
 - [x] Implemented Verified Magic-Link Handoff as the differentiated core: exact URL extraction, HTML-anchor preservation, permanent token masking, local-only URL inspection, sender/page/destination alignment, explicit captured-tab navigation, and replay blocking.
 - [x] Added adversarial magic-link gates for insecure schemes, embedded credentials, IP/local destinations, nonstandard ports, punycode, shorteners, opaque redirect wrappers, domain mismatch, lookalikes, sender conflict, expiry/staleness, and reuse.
 - [x] Added deterministic Trusted Reference Transfer for explicitly labeled booking, application, and support references, including aligned and lookalike judge fixtures and no-submit browser coverage.
-- [x] Passed the beta.7 full release gate: formatting/lint/types, 87 unit/integration tests, three production builds, two packaged-extension acceptance tests, and seven installed-Chrome scenarios.
+- [x] Passed the beta.7 full release gate: formatting/lint/types, 88 unit/integration tests, three production builds, two packaged-extension acceptance tests, and seven installed-Chrome scenarios.
 - [x] Packaged and integrity-checked the beta.7 extension and companion, completed the clean-install companion smoke, scanned the extension bundle for secret names, and confirmed zero production audit vulnerabilities.
 - [ ] Complete one user-observed real Gmail magic-login or email-confirmation handoff after reloading the beta extension.
 - [ ] Publish and verify the `v0.2.0-beta.7` public release artifacts and checksums.

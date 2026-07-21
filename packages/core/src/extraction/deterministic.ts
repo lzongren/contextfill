@@ -60,25 +60,24 @@ function extractCode(text: string): string | null {
 function extractMagicLink(text: string): string | null {
   const links = extractHttpUrls(text);
   if (links.length === 0) return null;
-  return (
-    links
-      .map((link) => {
-        const index = text.indexOf(link);
-        const context = text.slice(Math.max(0, index - 180), index + link.length + 100);
-        let score = magicLinkLanguage.test(context) ? 20 : 0;
-        try {
-          const url = new URL(link);
-          if (/\b(magic|login|signin|sign-in|verify|confirm|activate)\b/i.test(url.pathname)) {
-            score += 8;
-          }
-        } catch {
-          score -= 20;
+  const best = links
+    .map((link) => {
+      const index = text.indexOf(link);
+      const context = text.slice(Math.max(0, index - 180), index + link.length + 100);
+      let score = magicLinkLanguage.test(context) ? 20 : 0;
+      try {
+        const url = new URL(link);
+        if (/\b(magic|login|signin|sign-in|verify|confirm|activate)\b/i.test(url.pathname)) {
+          score += 8;
         }
-        if (/\b(unsubscribe|privacy policy|manage preferences)\b/i.test(context)) score -= 40;
-        return { link, score };
-      })
-      .sort((a, b) => b.score - a.score)[0]?.link ?? null
-  );
+      } catch {
+        score -= 20;
+      }
+      if (/\b(unsubscribe|privacy policy|manage preferences)\b/i.test(context)) score -= 40;
+      return { link, score };
+    })
+    .sort((a, b) => b.score - a.score)[0];
+  return best && best.score >= 8 ? best.link : null;
 }
 
 function extractReference(text: string): string | null {

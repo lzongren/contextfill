@@ -81,6 +81,22 @@ describe('deterministic extraction', () => {
     ).toBeNull();
   });
 
+  it('does not mistake an unsubscribe URL for a mentioned magic link', () => {
+    expect(
+      extractDeterministic({
+        id: 'unsubscribe-only',
+        source: 'gmail',
+        senderName: 'Example',
+        senderAddress: 'hello@example.test',
+        subject: 'Your magic link was sent separately',
+        body: 'Manage preferences or unsubscribe: https://example.test/unsubscribe/list-token',
+        receivedAt: now.toISOString(),
+        expiresAt: null,
+        serviceHint: 'Example',
+      }),
+    ).toBeNull();
+  });
+
   it('extracts an explicit booking reference but not a generic order number', () => {
     const reference = extractDeterministic(
       messages.find((message) => message.id === 'booking-reference')!,

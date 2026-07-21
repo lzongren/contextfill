@@ -4,8 +4,8 @@ Release candidate checked on 2026-07-20 in the local macOS workspace.
 
 | Check                         | Command                                                      | Result                                                   |
 | ----------------------------- | ------------------------------------------------------------ | -------------------------------------------------------- |
-| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 16 files / 87 tests passed      |
-| Unit and integration          | `npm test`                                                   | 16 files, 87 tests passed                                |
+| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 16 files / 88 tests passed      |
+| Unit and integration          | `npm test`                                                   | 16 files, 88 tests passed                                |
 | Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built             |
 | Packaged MV3 acceptance       | `npm run test:extension`                                     | 2 Chromium tests passed                                  |
 | Installed-Chrome acceptance   | `npm run test:browser`                                       | 7 Chrome tests passed                                    |
