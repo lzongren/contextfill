@@ -1,8 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServiceApp } from '../../apps/local-service/src/app.js';
-import { extractWithGpt, type ResponsesClient } from '../../apps/local-service/src/extractor.js';
+import {
+  extractCapsuleWithGpt,
+  extractWithGpt,
+  type ResponsesClient,
+} from '../../apps/local-service/src/extractor.js';
 import type { MailboxManagerLike } from '../../apps/local-service/src/mailbox.js';
-import { extractDeterministic, makeSyntheticInbox } from '../../packages/core/src/index.js';
+import {
+  extractContextCapsuleDeterministic,
+  extractDeterministic,
+  makeCapsuleInbox,
+  makeSyntheticInbox,
+} from '../../packages/core/src/index.js';
 
 const now = new Date('2026-07-20T19:00:00.000Z');
 const message = makeSyntheticInbox(now)[0]!;
@@ -152,5 +161,45 @@ describe('GPT structured-output validation', () => {
     await expect(extractWithGpt(resetMessage, { responses })).rejects.toThrow(
       'unsupported or high-risk',
     );
+  });
+
+  it('validates GPT capsule facts without accepting authorization or target fields', async () => {
+    const capsuleMessage = makeCapsuleInbox(new Date('2026-07-21T18:00:00.000Z'))[0]!;
+    const responses = {
+      create: vi.fn(async () => ({
+        output_text: JSON.stringify({
+          intent: 'travel_check_in',
+          claimedService: 'Aurelia Air',
+          referencedDomains: ['checkin.aurelia-air.test'],
+          facts: [
+            {
+              key: 'booking_reference',
+              value: 'AU-47K2',
+              confidence: 0.98,
+              supportingText: ['Booking reference: AU-47K2'],
+            },
+            {
+              key: 'passenger_surname',
+              value: 'Rivera',
+              confidence: 0.97,
+              supportingText: ['Passenger surname: Rivera'],
+            },
+          ],
+        }),
+      })),
+    } as unknown as ResponsesClient['responses'];
+    const capsule = await extractCapsuleWithGpt(
+      capsuleMessage,
+      { responses },
+      new Date('2026-07-21T18:00:00.000Z'),
+    );
+    expect(capsule).toMatchObject({
+      extractionMethod: 'gpt-5.6',
+      intent: 'travel_check_in',
+      facts: [{ value: 'AU-47K2' }, { value: 'Rivera' }],
+    });
+    expect(capsule).not.toHaveProperty('authorization');
+    expect(capsule).not.toHaveProperty('targetFields');
+    expect(extractContextCapsuleDeterministic(capsuleMessage)).not.toBeNull();
   });
 });

@@ -1,9 +1,17 @@
 import {
   applyExplicitFill,
+  authorizeContextCapsule,
+  capsuleMessagesForScenario,
+  createCapsuleMappingPlan,
+  executeContextCapsuleTransfer,
+  extractContextCapsulesDeterministic,
   extractInboxDeterministic,
   findContextField,
+  hasConflictingTravelCapsules,
   messagesForScenario,
+  mountContextCapsuleOverlay,
   rankCandidates,
+  type CapsuleTransferReceipt,
   type PageContext,
 } from '../../../packages/core/src/index.js';
 import './styles.css';
@@ -16,12 +24,99 @@ type Scenario = {
   description: string;
   hostname: string;
   service: string;
-  kind: 'single' | 'split' | 'reference' | 'none';
+  kind: 'single' | 'split' | 'reference' | 'capsule' | 'none';
   expectation: string;
   tone: 'safe' | 'danger' | 'neutral';
 };
 
 const scenarios: Scenario[] = [
+  {
+    id: 'capsule',
+    shortLabel: 'Capsule · verified',
+    eyebrow: 'Aurelia Air · online check-in',
+    title: 'Welcome aboard, when you are ready.',
+    description: 'Enter the booking details from your confirmation message to retrieve this trip.',
+    hostname: 'checkin.aurelia-air.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation:
+      'The in-page capsule maps exactly two masked facts, transfers them only after approval, supports one-click Undo, and never submits.',
+    tone: 'safe',
+  },
+  {
+    id: 'capsule-lookalike',
+    shortLabel: 'Capsule · lookalike',
+    eyebrow: 'Controlled lookalike fixture',
+    title: 'Welcome aboard, when you are ready.',
+    description: 'This domain removes the airline name’s hyphen while preserving the page design.',
+    hostname: 'checkin.aureliaair.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation:
+      'The in-page chain stops at trust verification, explains the registrable-domain mismatch, and changes no field.',
+    tone: 'danger',
+  },
+  {
+    id: 'capsule-decoy',
+    shortLabel: 'Capsule · decoy field',
+    eyebrow: 'Expected: only two destinations',
+    title: 'Retrieve your Aurelia Air trip',
+    description: 'A hidden decoy and unrelated loyalty field must remain untouched.',
+    hostname: 'checkin.aurelia-air.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation:
+      'Only booking reference and passenger surname receive values; decoys remain unchanged.',
+    tone: 'safe',
+  },
+  {
+    id: 'capsule-conflict',
+    shortLabel: 'Capsule · conflict',
+    eyebrow: 'Expected: no automatic choice',
+    title: 'Retrieve your Aurelia Air trip',
+    description: 'Two recent booking messages contain different passenger details.',
+    hostname: 'checkin.aurelia-air.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation: 'ContextFill warns about conflicting messages and transfers nothing.',
+    tone: 'neutral',
+  },
+  {
+    id: 'capsule-stale',
+    shortLabel: 'Capsule · stale',
+    eyebrow: 'Expected: stale block',
+    title: 'Retrieve your Aurelia Air trip',
+    description: 'The only booking confirmation is outside the 24-hour check-in window.',
+    hostname: 'checkin.aurelia-air.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation: 'The capsule is blocked as stale and no field changes.',
+    tone: 'danger',
+  },
+  {
+    id: 'capsule-non-empty',
+    shortLabel: 'Capsule · preserve input',
+    eyebrow: 'Expected: no overwrite',
+    title: 'Retrieve your Aurelia Air trip',
+    description: 'The passenger surname already contains a user-entered value.',
+    hostname: 'checkin.aurelia-air.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation: 'The handoff is blocked and the existing surname is preserved.',
+    tone: 'neutral',
+  },
+  {
+    id: 'capsule-reduced-motion',
+    shortLabel: 'Capsule · reduced motion',
+    eyebrow: 'Expected: accessible sequence',
+    title: 'Retrieve your Aurelia Air trip',
+    description: 'The same chain is presented without transitional motion.',
+    hostname: 'checkin.aurelia-air.test',
+    service: 'Aurelia Air',
+    kind: 'capsule',
+    expectation: 'Every trust and mapping state remains understandable without animation.',
+    tone: 'safe',
+  },
   {
     id: 'magic-link',
     shortLabel: 'Allow · magic link',
@@ -180,8 +275,7 @@ const scenarios: Scenario[] = [
   },
 ];
 
-const selectedId =
-  new URLSearchParams(window.location.search).get('scenario') ?? 'legitimate-single';
+const selectedId = new URLSearchParams(window.location.search).get('scenario') ?? 'capsule';
 const selected = scenarios.find((scenario) => scenario.id === selectedId) ?? scenarios[0]!;
 
 function setFixtureMetadata(scenario: Scenario): void {
@@ -200,7 +294,7 @@ function setFixtureMetadata(scenario: Scenario): void {
   }
 }
 
-function fieldMarkup(kind: Scenario['kind']): string {
+function fieldMarkup(kind: Scenario['kind'], scenarioId: string): string {
   if (kind === 'none')
     return '<p class="no-field">This fixture intentionally has no verification field.</p>';
   if (kind === 'split') {
@@ -216,6 +310,18 @@ function fieldMarkup(kind: Scenario['kind']): string {
       Booking reference
       <input id="bookingReference" name="bookingReference" type="text" maxlength="20" autocomplete="off" placeholder="Example: AB-12CDE" />
     </label>`;
+  }
+  if (kind === 'capsule') {
+    const existingSurname = scenarioId === 'capsule-non-empty' ? 'User entered' : '';
+    const decoy =
+      scenarioId === 'capsule-decoy'
+        ? '<label hidden>Booking reference decoy<input id="hiddenBookingDecoy" name="bookingReferenceDecoy" type="text" hidden value="DO-NOT-CHANGE" /></label><label class="code-field" for="loyaltyNumber">Loyalty number<input id="loyaltyNumber" name="loyaltyNumber" type="text" autocomplete="off" /></label>'
+        : '';
+    return `<div class="capsule-fields">
+      <label class="code-field" for="bookingReference">Booking reference<input id="bookingReference" name="bookingReference" type="text" maxlength="20" autocomplete="off" placeholder="Example: AB-12CDE" /></label>
+      <label class="code-field" for="passengerSurname">Passenger surname<input id="passengerSurname" name="passengerSurname" type="text" maxlength="80" autocomplete="family-name" value="${existingSurname}" placeholder="Surname on booking" /></label>
+      ${decoy}
+    </div>`;
   }
   return `<label class="code-field" for="verificationCode">
     Verification code
@@ -238,7 +344,7 @@ function navMarkup(): string {
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `
   <header class="topbar">
-    <a class="brand" href="?scenario=legitimate-single" aria-label="ContextFill judge lab home">
+    <a class="brand" href="?scenario=capsule" aria-label="ContextFill judge lab home">
       <span class="brand-mark" aria-hidden="true"><span></span></span>
       <span>ContextFill</span><small>Judge Lab</small>
     </a>
@@ -248,11 +354,11 @@ app.innerHTML = `
     <aside class="lab-panel" aria-label="Demo scenarios">
       <p class="section-kicker">Deterministic fixtures</p>
       <h1>Trust should be visible.</h1>
-      <p>Switch scenarios, then open the ContextFill extension. Localhost never pretends to be the simulated domain.</p>
+      <p>Watch the in-page trust chain, then approve or block one reversible handoff. Localhost never pretends to be the simulated domain.</p>
       <nav>${navMarkup()}</nav>
       <div class="lab-note">
         <strong>Quick judge path</strong>
-        <span>Run Allow · magic link, Block · link lookalike, then Allow · reference. No account or API key required.</span>
+        <span>Run Capsule · verified, Undo, then Capsule · lookalike. No popup, account, API key, or network request required.</span>
       </div>
     </aside>
     <section class="stage">
@@ -274,9 +380,9 @@ app.innerHTML = `
                 <p>${selected.id === 'magic-link-complete' ? 'No form was submitted and no link was prefetched.' : 'Open ContextFill to inspect the message and destination locally.'}</p>
               </div>`
             : `<form id="verification-form" novalidate>
-                ${fieldMarkup(selected.kind)}
+                ${fieldMarkup(selected.kind, selected.id)}
                 <label class="remember"><input id="remember" type="checkbox" /> Remember this browser</label>
-                <button class="verify-button" type="submit">Verify &amp; continue</button>
+                <button class="verify-button" type="submit">${selected.kind === 'capsule' ? 'Check in' : 'Verify &amp; continue'}</button>
                 <p id="submit-status" class="submit-status" role="status">The form has not been submitted.</p>
               </form>`
         }
@@ -340,6 +446,76 @@ window.contextFillHarness = {
   },
 };
 
+const capsuleUsedIds = new Set<string>();
+let capsuleReceipt: CapsuleTransferReceipt | null = null;
+
+function capsuleFlow() {
+  const now = new Date();
+  const messages = capsuleMessagesForScenario(selected.id, now);
+  const capsules = extractContextCapsulesDeterministic(messages, now);
+  const capsule = capsules[0];
+  const sourceMessage = messages.find((message) => message.id === capsule?.messageId);
+  if (!capsule || !sourceMessage) return null;
+  const capsulePage = {
+    hostname: selected.hostname,
+    serviceHint: selected.service,
+    simulated: true,
+    scenario: selected.id,
+  };
+  const policy = authorizeContextCapsule(capsule, sourceMessage, capsulePage, {
+    now,
+    usedCapsuleIds: capsuleUsedIds,
+    hasConflictingRecentMessages: hasConflictingTravelCapsules(capsules),
+  });
+  const plan = createCapsuleMappingPlan(document, capsule);
+  return { capsule, sourceMessage, capsulePage, policy, plan };
+}
+
+function launchNativeCapsule(): void {
+  const flow = capsuleFlow();
+  if (!flow) return;
+  mountContextCapsuleOverlay(document, {
+    capsule: flow.capsule,
+    message: flow.sourceMessage,
+    page: flow.capsulePage,
+    policy: flow.policy,
+    plan: flow.plan,
+    reducedMotion: selected.id === 'capsule-reduced-motion',
+    sourceLabel: 'Built-in synthetic inbox',
+    onTransfer: () => {
+      capsuleReceipt = executeContextCapsuleTransfer(
+        flow.capsule,
+        flow.policy,
+        flow.plan,
+        capsuleUsedIds,
+      );
+      return capsuleReceipt;
+    },
+  });
+}
+
+if (
+  selected.kind === 'capsule' &&
+  new URLSearchParams(window.location.search).get('extension') !== '1'
+) {
+  launchNativeCapsule();
+}
+
+window.contextFillCapsuleHarness = {
+  inspect() {
+    const flow = capsuleFlow();
+    return {
+      decision: flow?.policy.decision ?? 'empty',
+      reasonCode: flow?.policy.reasonCode ?? 'no_capsule',
+      mappingDecision: flow?.plan.decision ?? 'block',
+      mappingReasonCode: flow?.plan.reasonCode ?? 'missing_field',
+    };
+  },
+  undo() {
+    return capsuleReceipt?.undo() ?? false;
+  },
+};
+
 declare global {
   interface Window {
     contextFillHarness: {
@@ -350,6 +526,15 @@ declare global {
         fieldCount: number;
       };
       fill: () => boolean;
+    };
+    contextFillCapsuleHarness: {
+      inspect: () => {
+        decision: string;
+        reasonCode: string;
+        mappingDecision: string;
+        mappingReasonCode: string;
+      };
+      undo: () => boolean;
     };
   }
 }

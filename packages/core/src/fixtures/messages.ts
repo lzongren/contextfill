@@ -122,3 +122,60 @@ export function messagesForScenario(scenario: string | null, now = new Date()): 
   const ids = new Set(scenarioMessageIds[scenario]);
   return inbox.filter((message) => ids.has(message.id));
 }
+
+export function makeCapsuleInbox(now = new Date()): SyntheticMessage[] {
+  return [
+    {
+      id: 'aurelia-check-in-current',
+      source: 'synthetic',
+      senderName: 'Aurelia Air',
+      senderAddress: 'checkin@aurelia-air.test',
+      subject: 'Booking AU-47K2 for Rivera — Aurelia Air confirmation',
+      body: 'Your flight is ready for check-in. Booking reference: AU-47K2. Passenger surname: Rivera. Check in only at checkin.aurelia-air.test. This message contains no payment or identity-document request.',
+      receivedAt: iso(now, -minutes(6)),
+      expiresAt: null,
+      serviceHint: 'Aurelia Air',
+    },
+    {
+      id: 'aurelia-check-in-conflict',
+      source: 'synthetic',
+      senderName: 'Aurelia Air',
+      senderAddress: 'checkin@aurelia-air.test',
+      subject: 'A different Aurelia Air booking confirmation',
+      body: 'Your flight is ready for check-in. Booking reference: AU-99Q8. Passenger surname: Chen. Check in only at checkin.aurelia-air.test.',
+      receivedAt: iso(now, -minutes(3)),
+      expiresAt: null,
+      serviceHint: 'Aurelia Air',
+    },
+    {
+      id: 'aurelia-check-in-stale',
+      source: 'synthetic',
+      senderName: 'Aurelia Air',
+      senderAddress: 'checkin@aurelia-air.test',
+      subject: 'Older Aurelia Air booking confirmation',
+      body: 'Your flight is ready for check-in. Booking reference: AU-11OLD. Passenger surname: Rivera. Check in only at checkin.aurelia-air.test.',
+      receivedAt: iso(now, -minutes(25 * 60)),
+      expiresAt: null,
+      serviceHint: 'Aurelia Air',
+    },
+  ];
+}
+
+const capsuleScenarioMessageIds: Record<string, string[]> = {
+  capsule: ['aurelia-check-in-current'],
+  'capsule-lookalike': ['aurelia-check-in-current'],
+  'capsule-decoy': ['aurelia-check-in-current'],
+  'capsule-conflict': ['aurelia-check-in-current', 'aurelia-check-in-conflict'],
+  'capsule-non-empty': ['aurelia-check-in-current'],
+  'capsule-reduced-motion': ['aurelia-check-in-current'],
+};
+
+export function capsuleMessagesForScenario(
+  scenario: string | null,
+  now = new Date(),
+): SyntheticMessage[] {
+  const inbox = makeCapsuleInbox(now);
+  if (scenario === 'capsule-stale') return inbox.filter((message) => message.id.endsWith('stale'));
+  const ids = new Set(capsuleScenarioMessageIds[scenario ?? ''] ?? ['aurelia-check-in-current']);
+  return inbox.filter((message) => ids.has(message.id));
+}

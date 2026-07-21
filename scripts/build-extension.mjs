@@ -13,6 +13,7 @@ const entries = [
   ['src/popup.ts', 'popup.js'],
   ['src/content.ts', 'content.js'],
   ['src/background.ts', 'background.js'],
+  ['src/capsule-content.ts', 'capsule-content.js'],
 ];
 
 for (const [entry, outfile] of entries) {
