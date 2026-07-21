@@ -8,7 +8,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 - One-time link tokens, verification codes, and trusted references.
 - The relationship between a message, sender, service, destination, and initiating site.
-- The user's explicit consent to open or fill.
+- The user's Manual, Assisted, or Auto-Continue choice for an exact site and ability to observe/cancel an action.
 - The optional OpenAI API key.
 - Gmail and Microsoft OAuth access and refresh tokens.
 - The per-install loopback pairing capability.
@@ -19,13 +19,13 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 1. **Webpage → isolated content script:** the page DOM, labels, metadata, and fields are untrusted. Only localhost may provide a simulated hostname.
 2. **Mailbox provider, imported file, or synthetic message → normalization and extraction:** provider JSON, MIME structure, subject, body, sender, URLs, attachments, and any instructions in a message are untrusted data.
-3. **Extension popup → content script or initiating tab:** only an explicit popup action carries a value to a currently detected field or navigates the exact tab and URL captured during inspection.
+3. **Extension UI/background → content script or initiating tab:** Manual requires a popup action. Assisted requires an in-page action. Auto-Continue requires a stored exact-origin grant, a visible cancellable countdown, and fresh deterministic revalidation bound to the exact tab URL before any value or navigation is sent.
 4. **Popup → loopback service:** model extraction and mailbox requests use a fixed loopback endpoint. Real-mail endpoints require a paired capability and matching extension installation ID; browser `Origin` is cross-checked when present.
 5. **Loopback service → OS credential manager:** refresh tokens and the hashed pairing record persist through the native platform keychain; access tokens remain in memory.
 6. **Loopback service → Gmail/Microsoft APIs:** only bounded recent-message queries are made with delegated read-only scopes.
 7. **Loopback service → OpenAI API:** the API key remains server-side; a bounded message slice leaves the machine only when configured.
 8. **Model output → application state:** every field is schema-validated and evidence-checked before ranking or policy.
-9. **Policy → mutation/navigation:** an allow decision is required before link navigation. An allow decision, or an acknowledged eligible warning, is required before field filling. Link warnings and all block decisions cannot be overridden.
+9. **Policy → mutation/navigation:** automatic and Assisted actions require `allow`. Manual link navigation also requires `allow`; a manually acknowledged eligible warning may fill a value, but link warnings and all block decisions cannot be overridden.
 
 ## Threats and mitigations
 
@@ -33,7 +33,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A page presents an OTP-like field and induces the extension to choose a recent code for another service.
 
-**Mitigations:** The policy checks service names and registrable domains independently from field detection. Explicit message-domain mismatch and claimed-service conflict block. Candidate ranking heavily penalizes block decisions. The popup exposes the requesting hostname and reason before mutation.
+**Mitigations:** The policy checks service names and registrable domains independently from field detection. Explicit message-domain mismatch and claimed-service conflict block. Candidate ranking heavily penalizes block decisions. Manual UI and the in-page Auto-Continue card expose the requesting context and outcome before mutation. Automation never overrides a warning.
 
 **Residual risk:** A service with no reliable domain evidence may produce a warning. User override in warning states can still be socially engineered.
 
@@ -49,7 +49,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** Inspection consumes a one-time token, an opaque tracking wrapper hides the real destination, a link targets a different service, or an allowed link opens automatically or in a new tab that loses the initiating context.
 
-**Mitigations:** Inspection uses only the URL string already present in the normalized message. ContextFill performs no `fetch`, `HEAD`, preconnect, prefetch, redirect resolution, Safe Browsing lookup, image load, or clipboard copy. The deterministic inspector requires HTTPS and a registrable hostname; rejects embedded credentials, IP and local destinations, nonstandard ports, punycode/internationalized hosts, known shorteners, and opaque click/redirect paths; masks the final path segment plus all query/fragment data; and requires the destination registrable domain to align with both the initiating page and sender. The policy must be **allow**, the candidate must be fresh and unused, and the user must click **Open verified link in this tab**. The controller rechecks that the captured tab still has the exact scanned URL, records replay state, clears candidate state, and calls `chrome.tabs.update` only for that captured tab. Synthetic `.test` links map to an explicitly labeled localhost completion fixture without fetching or pretending to visit the represented domain.
+**Mitigations:** Inspection uses only the URL string already present in the normalized message. ContextFill performs no `fetch`, `HEAD`, preconnect, prefetch, redirect resolution, Safe Browsing lookup, image load, or clipboard copy. The deterministic inspector requires HTTPS and a registrable hostname; rejects embedded credentials, IP and local destinations, nonstandard ports, punycode/internationalized hosts, known shorteners, and opaque click/redirect paths; masks the final path segment plus all query/fragment data; and requires the destination registrable domain to align with both the initiating page and sender. The policy must be **allow** and the candidate fresh and unused. Manual/Assisted require an action; Auto requires prior exact-site consent plus a visible three-second countdown. The controller rechecks the exact captured URL, current page intent, site rule/permission, freshness, replay, and policy, records replay state, clears candidate state, and calls `chrome.tabs.update` only for that captured tab. Synthetic `.test` links map to an explicitly labeled localhost completion fixture without fetching or pretending to visit the represented domain.
 
 **Residual risk:** A same-domain endpoint can redirect after the explicit navigation, DNS or server ownership can change, and the destination service ultimately controls the response. ContextFill deliberately refuses links whose destination cannot be established locally, but it cannot prove future network behavior without consuming the link. Public-suffix, URL-parser, browser, and extension integrity remain trusted dependencies.
 
@@ -97,7 +97,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A local attacker steals a refresh token, a connector requests write access, or an API response causes broad mailbox disclosure.
 
-**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. The non-secret readiness doctor derives callbacks and scopes from runtime configuration, rejects service/callback port drift, and checks private `.env` permissions before consent. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail searches one day of temporary-action phrases and retrieves at most 12 bodies; Outlook filters 25 recent summaries to at most 10 code, magic-link, or reference-like results. HTML-only message normalization preserves HTTPS anchor destinations as inert text without loading them. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
+**Mitigations:** Gmail uses only `gmail.readonly`; Microsoft uses delegated `Mail.Read`, never application or write permissions. OAuth uses PKCE, random state, exact loopback redirects, and bounded pending-state lifetime. The non-secret readiness doctor derives callbacks and scopes from runtime configuration, rejects service/callback port drift, and checks private `.env` permissions before consent. Access tokens stay in service memory; refresh tokens use the native OS credential manager and are deleted on disconnect. A failed durable deletion is surfaced to the extension instead of being reported as success. Gmail explicitly excludes Spam and Trash while searching one day of temporary-action phrases and retrieves at most 12 bodies; Outlook queries only the Inbox and filters 25 recent summaries to at most 10 code, magic-link, or reference-like results. HTML-only message normalization preserves HTTPS anchor destinations as inert text without loading them. Provider responses are normalized through strict schemas before reaching extraction. Real messages use deterministic extraction unless the user separately opts into sending prefiltered content through the configured OpenAI service.
 
 **Residual risk:** Local malware running as the user can inspect process memory or invoke the same credential APIs. Gmail's scope still permits broad read access and requires provider review for public distribution. Live provider audit verification remains required before general release.
 
@@ -113,7 +113,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A full code, reference, or one-time link token leaks through UI, logs, clipboard, persistent extension storage, telemetry, or screenshots.
 
-**Mitigations:** Production code does not log candidate values, never touches the clipboard, and has no analytics. Extension storage contains only the selected persistent source, model opt-in, and random pairing capability; access is restricted to trusted extension contexts. Imported files, candidate values, message bodies, and OAuth tokens are excluded. Codes and references are masked by default and cannot be revealed on blocks; link path/query/fragment secrets are never revealed. Candidate state clears after action/dismissal/expiry/90 seconds. Refresh tokens and only the hash of the pairing capability use the OS keychain.
+**Mitigations:** Production code does not log candidate values, never touches the clipboard, and has no analytics. Extension storage contains the selected persistent source, model opt-in, random pairing capability, exact-origin automation rules, session-only replay IDs, and a privacy-minimized activity log. The strict activity schema permits only hostname, candidate type, outcome/reason code, timestamp, and random ID; it rejects candidate values, link URLs, subjects, senders, bodies, and page paths. History is capped at 24 records, expires after seven days, and is user-clearable. Imported files, candidate values, message bodies, and OAuth tokens are excluded. Codes and references are masked by default and cannot be revealed on blocks; link path/query/fragment secrets are never revealed. Refresh tokens and only the hash of the pairing capability use the OS keychain.
 
 **Residual risk:** A user can intentionally reveal or photograph a code. Browser developer tooling or local profile access can expose extension memory and its pairing capability.
 
@@ -121,7 +121,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 **Threat:** A compromised extension can read arbitrary sites continuously.
 
-**Mitigations:** `activeTab` grants temporary page access only after invocation; `scripting` injects on demand into the main frame. There is no persistent content-script match. Fixed host access is limited to the loopback companion and judge lab. Optional HTTP(S) patterns are declared but not granted by default; if injection lacks access, the popup requests one exact origin at runtime and continues only after the user grants it.
+**Mitigations:** `activeTab` grants temporary page access only after invocation; `scripting` injects into the main frame. There is no manifest content-script match. Fixed host access is limited to the loopback companion and judge lab. Optional HTTP(S) patterns are declared but not granted by default. Assisted/Auto require an explicit exact-origin permission and store that origin's mode; settings display protocol/host/port and revoke both rule and permission. No path, query, or browsing-history list is retained.
 
 **Residual risk:** During the active-tab grant, compromised extension code could inspect the active page. Supply-chain and extension integrity still matter.
 
@@ -143,11 +143,11 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 
 ### Automatic navigation, submission, or unintended page mutation
 
-**Threat:** Merely opening ContextFill navigates or consumes a link, or filling triggers Verify/Continue, changes unrelated inputs, or modifies hidden/disabled fields.
+**Threat:** Automation acts without meaningful consent or a visible chance to cancel; a changed page receives a stale action; a page hides the countdown; filling triggers Verify/Continue, changes unrelated inputs, or modifies hidden/disabled fields.
 
-**Mitigations:** Scanning and confirmation never call the navigation controller. Only the explicit Open button can invoke same-tab navigation. Detection rejects hidden, disabled, read-only, and unrelated inputs; split fills require a contextual 4–8 input group, and reference fill requires an explicit booking/application/support-reference label. Mutation uses the native value setter plus `input` and `change` events only. Both fill and navigation recheck the exact captured tab URL. No button click, Enter key, `requestSubmit`, or `submit` call exists. Unit, packaged-extension, and installed-Chrome tests assert inert inspection, same-tab handoff, replay block, zero submit count, and unchanged unrelated controls.
+**Mitigations:** Every origin starts Manual. Assisted/Auto require an exact-origin permission, and Auto requires a separate acknowledgement. Auto renders a top-layer in-page card with waiting/found/verified/countdown states, a visible Cancel action, ARIA live updates, keyboard controls, and reduced-motion behavior. The countdown executes only while its host remains connected and visible; removal/hiding cancels. Immediately before action, ContextFill rechecks the exact tab URL, current hostname and visible action intent, exact-origin rule/permission, candidate age/expiry/replay, and deterministic `allow` policy. Multiple recent allowed candidates with different values block automation. Detection rejects hidden, disabled, read-only, and unrelated inputs; split fills require a contextual 4–8 input group. Mutation uses the native value setter plus `input` and `change` events only. No button click, Enter key, `requestSubmit`, or `submit` call exists. Packaged tests cover countdown cancellation, page removal fail-closed, changed/dynamic SPA state, exact-origin revocation, same-tab handoff, replay block, zero submit count, and unchanged unrelated controls.
 
-**Residual risk:** A hostile page can attach an `input` listener that submits in response to any value change. The extension itself never submits, but it cannot prevent page-owned event handlers. A production version should warn about or detect synchronous navigation/submission after mutation.
+**Residual risk:** A hostile or ordinary page can attach an `input` listener that submits in response to any value change. The extension itself never submits, but it cannot prevent page-owned event handlers; the Auto opt-in explicitly warns about this. A page can visually imitate ContextFill outside the closed Shadow DOM, and assistive technologies/browser combinations may announce live regions differently. A production version should detect synchronous page-owned submission/navigation and offer richer per-action policy.
 
 ### Accidental private data in fixtures or media
 
@@ -161,7 +161,7 @@ This review covers the Chrome MV3 extension, synthetic fixtures, one-time `.eml`
 - Verifying mailbox transport authentication or sender account integrity.
 - Hosted multi-user mailbox service or server-side storage of user mail.
 - Hosted synchronization of OAuth credentials or mailbox content.
-- Password capture, password-manager behavior, clipboard management, link prefetch, automatic navigation, or automatic submission.
+- Password capture, password-manager behavior, clipboard management, link prefetch, silent/broad navigation, or extension-initiated form submission.
 - Password-reset, account-recovery, payment-authorization, wire-transfer, document-signing, or e-signature links.
 - URL shorteners, opaque click/redirect wrappers, IP/local destinations, nonstandard link ports, or internationalized link destinations.
 - Iframe, cross-origin frame, or closed shadow-root field support.

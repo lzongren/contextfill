@@ -106,7 +106,39 @@ describe('explicit verified navigation', () => {
         { ...request, policy: { ...request.policy, decision: 'block' } },
         blocked.dependencies,
       ),
-    ).rejects.toThrow('Explicit approval');
+    ).rejects.toThrow('User authorization');
     expect(blocked.calls).toEqual([]);
+  });
+
+  it('accepts a locally authorized Auto-Continue handoff bound to the checked page hostname', async () => {
+    const automaticRequest = {
+      candidate: request.candidate,
+      policy: request.policy,
+      page: request.page,
+      source: request.source,
+      tabId: request.tabId,
+      scannedTabUrl: request.scannedTabUrl,
+    };
+    const harness = dependencies();
+    await performVerifiedNavigation(
+      {
+        ...automaticRequest,
+        autoContinue: { pageHostname: page.hostname },
+      },
+      harness.dependencies,
+    );
+    expect(harness.calls).toEqual(['mark-used', 'clear', 'navigate']);
+
+    const rejected = dependencies();
+    await expect(
+      performVerifiedNavigation(
+        {
+          ...automaticRequest,
+          autoContinue: { pageHostname: 'lookalike.test' },
+        },
+        rejected.dependencies,
+      ),
+    ).rejects.toThrow('User authorization');
+    expect(rejected.calls).toEqual([]);
   });
 });

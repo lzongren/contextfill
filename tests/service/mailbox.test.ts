@@ -124,7 +124,11 @@ describe('mailbox OAuth and provider adapters', () => {
         return Response.json({ emailAddress: 'person@gmail.example' });
       }
       if (url.includes('/users/me/messages?')) {
-        const query = new URL(url).searchParams.get('q');
+        const parsedUrl = new URL(url);
+        const query = parsedUrl.searchParams.get('q');
+        expect(parsedUrl.searchParams.get('includeSpamTrash')).toBe('false');
+        expect(query).not.toContain('in:anywhere');
+        expect(query).not.toContain('label:spam');
         expect(query).toContain('"magic link"');
         expect(query).toContain('"secure access link"');
         expect(query).toContain('"sign in to"');
@@ -186,7 +190,7 @@ describe('mailbox OAuth and provider adapters', () => {
       if (url.includes('/v1.0/me?$select=')) {
         return Response.json({ mail: 'person@outlook.example' });
       }
-      if (url.includes('/v1.0/me/messages?')) {
+      if (url.includes('/v1.0/me/mailFolders/inbox/messages?')) {
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer outlook-access');
         expect(new Headers(init?.headers).get('prefer')).toBeNull();
         return Response.json({

@@ -16,7 +16,7 @@ describe('runtime site access', () => {
     });
     expect(siteAccessRequest('http://127.0.0.1:4173/?scenario=legitimate-single')).toEqual({
       hostname: '127.0.0.1',
-      originPattern: 'http://127.0.0.1/*',
+      originPattern: 'http://127.0.0.1:4173/*',
     });
   });
 

@@ -10,7 +10,7 @@ export function siteAccessRequest(urlInput: string | undefined): SiteAccessReque
     if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) return null;
     return {
       hostname: url.hostname,
-      originPattern: `${url.protocol}//${url.hostname}/*`,
+      originPattern: `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ''}/*`,
     };
   } catch {
     return null;

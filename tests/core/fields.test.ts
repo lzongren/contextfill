@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   fillTransferValue,
+  detectAutomaticPageSignal,
   findContextField,
   findReferenceField,
   findVerificationFields,
@@ -125,5 +126,42 @@ describe('field detection and filling', () => {
   it('does not classify a generic order-number input as a trusted reference target', () => {
     document.body.innerHTML = `<label>Order number<input name="orderNumber" data-contextfill-visible="true"></label>`;
     expect(findReferenceField(document)).toBeNull();
+  });
+
+  it('detects OTP and visible magic-link wait states without treating generic pages as eligible', () => {
+    document.body.innerHTML = `
+      <main><h1>Check your email inbox</h1>
+        <p>To sign in, click the magic link or enter the code we sent.</p>
+        <label>Verification code<input autocomplete="one-time-code" maxlength="6" data-contextfill-visible="true"></label>
+      </main>`;
+    expect(detectAutomaticPageSignal(document).intents).toEqual(['otp', 'magic_link']);
+
+    document.body.innerHTML = `<main><h1>Welcome back</h1><p>Read the latest product news.</p></main>`;
+    expect(detectAutomaticPageSignal(document).intents).toEqual([]);
+  });
+
+  it('documents site-owned auto-submit behavior triggered by the final input event', () => {
+    document.body.innerHTML = `
+      <form><label>Verification code<input autocomplete="one-time-code" maxlength="6" data-contextfill-visible="true"></label><button>Submit</button></form>`;
+    const form = document.querySelector('form')!;
+    const input = document.querySelector<HTMLInputElement>('input')!;
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    form.addEventListener('submit', submit);
+    input.addEventListener('input', () => {
+      form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(fillTransferValue(findVerificationFields(document)!, '481203')).toBe(true);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(input.value).toBe('481203');
+  });
+
+  it('ignores hidden and disabled decoy OTP fields during automatic detection', () => {
+    document.body.innerHTML = `
+      <main><h1>Account overview</h1>
+        <input type="hidden" autocomplete="one-time-code" value="decoy">
+        <input disabled autocomplete="one-time-code" maxlength="6" value="decoy" data-contextfill-visible="true">
+      </main>`;
+    expect(findVerificationFields(document)).toBeNull();
+    expect(detectAutomaticPageSignal(document).intents).toEqual([]);
   });
 });

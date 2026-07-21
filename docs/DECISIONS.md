@@ -4,9 +4,9 @@
 
 The extension popup and demo use small TypeScript DOM renderers. Their state is compact, so React would add bundle and dependency surface without improving reliability.
 
-## D-002: Programmatic injection instead of permanent content-script matches
+## D-002: Programmatic injection with exact-site automation grants
 
-The extension requests `activeTab` and `scripting`. It injects only after the user opens ContextFill and starts a scan. Some Chromium pages require host permission even after popup activation, so optional HTTP(S) patterns are declared but receive no access by default. On a permission error, ContextFill derives one exact origin and asks the user before retrying.
+The extension requests `activeTab` and `scripting` and declares optional HTTP(S) origins that receive no access by default. Manual mode injects after the user opens ContextFill. Assisted and Auto-Continue inject only on an exact origin the user explicitly granted and configured. Dynamic top-level DOM observation notices SPA wait states without a permanent all-sites content-script declaration. Trusted-site settings display and revoke each exact origin.
 
 ## D-003: Model extracts facts; policy stays deterministic
 
@@ -66,17 +66,17 @@ Setting the Microsoft authority to `common` lets a correctly registered applicat
 
 Copying a Gmail client secret into a command argument leaks it into shell history, while an ordinary prompt may echo it. ContextFill instead accepts Google's downloaded OAuth web-client JSON with `--setup gmail --credentials`. It rejects symlinks, non-files, files over 64 KB, malformed or non-web clients, invalid credential shapes, and registrations missing the exact runtime callback. Only the ID and secret are written to the owner-only `.env`; the command prints neither and immediately runs the non-secret readiness doctor. The user deletes Google's source JSON after import.
 
-## D-017: Verified Magic-Link Handoff is the differentiated core
+## D-017: Verified Auto-Continue is the differentiated core
 
-OTP fill remains useful but is already a crowded interaction. The public product story therefore starts with magic-login and email-confirmation links: ContextFill locates the action in a connected mailbox, explains why its sender, destination, and initiating page align, and opens it in the captured tab only after explicit approval. Trusted Reference Transfer is the secondary proof that the architecture is a general message-to-page action boundary rather than an OTP-specific feature.
+OTP fill alone is already a crowded interaction. The public product story is the whole “check your email” interruption: ContextFill detects the wait state, locates an OTP or magic-login/email-confirmation link, verifies why its sender, destination, and initiating page align, and visibly continues the task under a per-site mode. Verified magic links remain the differentiated action, while Trusted Reference Transfer is the secondary proof that the architecture is a general message-to-page boundary rather than an OTP-specific feature.
 
 ## D-018: One-time links are inspected without network activity
 
 A preflight request can consume a link or follow an attacker-controlled redirect. Link inspection therefore operates only on the URL string already present in the normalized message. It requires HTTPS and locally verifiable domain evidence, permanently masks token-bearing path/query/fragment data in the UI, and refuses credentials, IP/local hosts, nonstandard ports, internationalized hosts, shorteners, and opaque click/redirect endpoints. The extension performs no fetch, HEAD request, preconnect, prefetch, or redirect resolution.
 
-## D-019: Explicit navigation is bound to the scanned tab and URL
+## D-019: Every navigation is bound to the scanned tab and URL
 
-The popup records the initiating tab ID and exact URL at scan time. The navigation controller rechecks both, records candidate use, clears sensitive state, and calls `chrome.tabs.update` with that same ID. Filling uses the same captured-tab check. A synthetic `.test` action maps only to the fixed localhost completion scenario and is visibly identified as simulation; real-mail links use the exact inspected destination.
+Manual mode records the initiating tab ID and exact URL at scan time. Assisted and Auto-Continue record the same context when the page wait state is detected. The navigation controller requires either an explicit manual action or an exact-host Auto-Continue authorization, rechecks the tab ID and exact URL, records candidate use, clears sensitive state, and calls `chrome.tabs.update` with that same ID. Filling performs the same current-page revalidation. A synthetic `.test` action maps only to the fixed localhost completion scenario and is visibly identified as simulation; real-mail links use the exact inspected destination.
 
 ## D-020: Reference transfer is narrow and field-driven
 
@@ -85,3 +85,13 @@ Generic numbers and order IDs create unacceptable false positives. Deterministic
 ## D-021: Mixed login messages prefer the verified link without duplicating secrets
 
 Real providers may send a fallback OTP and a one-time link in the same message. When both are present, ContextFill selects the verified-link action; OTP-only messages retain their existing behavior. Supporting excerpts replace the exact URL with a fixed withheld marker and remain schema-bounded, while confirmation subjects mask embedded fallback codes. Gmail's normal bounded query intentionally does not opt into Spam or Trash; a legitimate message must be moved to the inbox before ContextFill will act on it.
+
+## D-022: Automation is mode-based, visible, cancellable, and revalidated
+
+Every new origin starts Manual. Assisted and Auto-Continue require an exact-origin optional permission; Auto additionally requires an acknowledgement that same-tab magic-link navigation and site-owned OTP auto-submit may occur. Assisted stops at an in-page action button. Auto shows waiting, found, verified, and three-second countdown states in a closed Shadow DOM card with a visible Cancel action, keyboard access, ARIA live updates, and reduced-motion behavior. If the card is removed or hidden, execution is cancelled.
+
+Immediately before an automatic fill or navigation, the background worker rechecks the exact tab URL, page hostname, current OTP/link intent, current exact-origin rule and permission, freshness, expiry, replay state, and deterministic `allow` decision. Warning, block, ambiguous competing-message, stale, changed-page, or revoked states fail closed. The extension dispatches field events but never clicks a button or invokes form submission; destination-page listeners remain outside its control.
+
+## D-023: Activity history must be useful without retaining message secrets
+
+Settings keep at most 24 records for seven days. The strict schema allows only hostname, candidate type, outcome, bounded reason code, timestamp, and a random record ID. Codes, link URLs/tokens, subjects, sender addresses, bodies, and page paths are structurally rejected. Users can clear history independently of trusted-site revocation. Replay IDs remain separate in session-only storage and never contain candidate values.

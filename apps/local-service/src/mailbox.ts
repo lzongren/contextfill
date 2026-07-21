@@ -695,6 +695,7 @@ export class MailboxManager implements MailboxManagerLike {
   private async listGmailMessages(): Promise<MailboxMessage[]> {
     const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
     listUrl.searchParams.set('maxResults', '20');
+    listUrl.searchParams.set('includeSpamTrash', 'false');
     listUrl.searchParams.set(
       'q',
       'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
@@ -716,7 +717,7 @@ export class MailboxManager implements MailboxManagerLike {
   }
 
   private async listOutlookMessages(): Promise<MailboxMessage[]> {
-    const url = new URL('https://graph.microsoft.com/v1.0/me/messages');
+    const url = new URL('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages');
     url.searchParams.set('$top', '25');
     url.searchParams.set('$orderby', 'receivedDateTime desc');
     url.searchParams.set('$select', 'id,subject,receivedDateTime,bodyPreview');

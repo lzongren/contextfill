@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/lzongren/contextfill/actions/workflows/ci.yml/badge.svg)](https://github.com/lzongren/contextfill/actions/workflows/ci.yml)
 
-> **ContextFill safely bridges the gap between “check your email” and continuing the task—starting with verified magic links.**
+> **ContextFill safely removes the interruption between “check your email” and continuing the task—automatically filling verified codes or following verified magic links while keeping the user informed and in control.**
 
-ContextFill is a privacy-first Chrome extension for **Verified Magic-Link Handoff**. It finds a magic-login or email-confirmation link in its built-in synthetic inbox, a one-time imported `.eml` file, or an explicitly connected Gmail/Outlook account; verifies that the sender, claimed service, link destination, freshness, and initiating tab align; explains an **allow**, **warn**, or **block** decision; and opens an allowed link in that same tab only after explicit approval. It never fetches or prefollows the link during inspection.
+ContextFill is a privacy-first Chrome extension for **Verified Auto-Continue**. On a site the user explicitly configures, it detects an email-verification wait state, finds the matching OTP or magic-login/email-confirmation link in an explicitly connected Gmail/Outlook account, and deterministically checks sender, claimed service, destination, freshness, replay state, and the initiating tab. A visible in-page card shows the trust progress. **Assisted** mode waits for an in-page confirmation; **Auto-Continue** uses a cancellable three-second countdown, then fills the code or opens the exact verified link in the same tab.
 
-The same deterministic message-to-page engine also supports verification codes and one narrowly scoped **Trusted Reference Transfer** for booking, application, and support references. It never automatically navigates, copies a value, submits a form, or lets a model authorize an action.
+Every new site starts **Manual**. Assisted and Auto-Continue require an exact-origin permission that is inspectable and revocable in settings, and Auto requires a separate acknowledgement that a site may submit after receiving the last OTP digit. ContextFill never fetches or prefollows a one-time link, touches the clipboard, clicks a Submit/Login button, calls a form submission API, or lets a model authorize an action. The same deterministic engine also retains manual **Trusted Reference Transfer** for narrowly scoped booking, application, and support references.
 
 This is a judge-testable hackathon prototype, not a production security product.
 
@@ -14,12 +14,13 @@ This is a judge-testable hackathon prototype, not a production security product.
 
 “Check your email” interrupts sign-in, confirmation, booking, and support flows. Users must locate the right message, distinguish the real action from lookalikes, and carry a one-time link or reference back to the correct page. Existing OTP autofill handles one narrow shape but does not provide a transparent, general message-to-page trust decision.
 
-ContextFill demonstrates a different interaction model. Extraction and authorization are separate:
+ContextFill demonstrates a different interaction model. Detection, extraction, authorization, and execution are separate:
 
 - An extractor identifies a bounded temporary action in one recent message.
 - Deterministic code checks the page hostname, registrable domain, sender evidence, claimed service, recency, expiry, replay state, and controlled lookalike signals.
-- A confirmation card makes the evidence and decision visible.
-- The user—not the model—chooses whether an allowed link opens in the initiating tab or a value fills the detected field.
+- An in-page status card makes waiting, matching, verification, countdown, success, and block states visible.
+- The user chooses Manual, Assisted, or Auto-Continue per exact site; the model never chooses a mode or authorizes an action.
+- Immediately before execution, ContextFill rechecks the exact tab URL, page hostname and intent, site permission/mode, candidate freshness/replay, and deterministic allow decision.
 
 ## Five-minute demo
 
@@ -42,6 +43,8 @@ Then:
 7. Open [http://127.0.0.1:4173/?scenario=magic-link-lookalike](http://127.0.0.1:4173/?scenario=magic-link-lookalike). Confirm that the lookalike initiating domain is blocked and no Open action exists.
 8. Open [http://127.0.0.1:4173/?scenario=reference](http://127.0.0.1:4173/?scenario=reference). Confirm that **Fill reference** changes only the booking-reference field and never submits.
 
+For the popup-free path, open **Automation** in the popup on an OTP or magic-link fixture, choose **Assisted** or acknowledge and enable **Auto-Continue**, then reload the fixture. The in-page card appears without reopening the popup. Assisted waits for confirmation; Auto-Continue counts down from three and remains cancellable. Switch the site back to **Manual**, or use **Manage trusted sites and activity → Revoke**, to remove both the rule and exact-origin permission.
+
 No email account, cloud setup, personal data, paid service, or OpenAI API key is required. See [Judge testing](docs/JUDGE_TESTING.md) for every fixture and expected result.
 
 For a real-message test without cloud setup, export one message from Gmail or Outlook as `.eml`, open **Message source → Import email file**, and choose it. The bounded file is parsed locally inside the popup, used once, and never persisted. For ongoing use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Outlook has a guided `contextfill-service --setup outlook` path that prints the exact callback and permissions, then privately saves the public client ID. Creating that registration requires a work/school account with an Entra tenant role or a personal account backed by its own Azure tenant; a standalone Outlook.com account can use the finished multitenant connector but cannot own its registration. Gmail's guided `contextfill-service --setup gmail` path prints its exact callback and imports Google's downloaded web-client JSON directly into owner-only configuration without printing the secret. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for both paths, least-privilege OAuth setup, current security boundaries, and provider limitations.
@@ -50,16 +53,18 @@ For a real-message test without cloud setup, export one message from Gmail or Ou
 
 ```mermaid
 flowchart LR
-  U["User opens popup"] --> C["On-demand content script"]
-  C --> F["Field and initiating-page context"]
+  W["Email wait state appears"] --> C["Configured exact-site content script"]
+  C --> F["Field, visible intent, and initiating-page context"]
   S["Synthetic inbox"] --> X["Candidate extraction"]
   I["One-time .eml import"] --> X
+  G["Gmail or Outlook companion"] --> X
   X --> R["Transparent ranking"]
   F --> P["Deterministic trust policy"]
   R --> P
-  P --> UI["Evidence and allow, warn, or block"]
-  UI -->|"Explicit Open"| T["Captured initiating tab"]
-  UI -->|"Explicit Fill"| C
+  P --> UI["Visible allow, warn, or block state"]
+  UI --> A["Assisted confirmation or Auto countdown"]
+  A -->|"Revalidate and open"| T["Captured initiating tab"]
+  A -->|"Revalidate and fill"| C
   C --> M["Detected input mutation only"]
   T --> O["Same-tab navigation"]
   M -. "never" .-> N["Form submission"]
@@ -72,7 +77,7 @@ The main boundaries are deliberately small:
 
 - `packages/core` owns schemas, fixtures, extraction, ranking, domains, policy, confirmation data, and field mutation.
 - `apps/demo` owns honest localhost fixtures and their visible simulated hostnames.
-- `apps/extension` owns user activation, local MIME import, evidence presentation, explicit approval, and short-lived state.
+- `apps/extension` owns Manual/Assisted/Auto modes, exact-site permission and revocation, dynamic page detection, the visible cancellable overlay, local MIME import, and short-lived sensitive state.
 - `apps/local-service` owns the API key and optional GPT-5.6 Responses API call.
 - The same loopback service owns Gmail/Outlook OAuth tokens and normalizes a bounded recent-message set; tokens never enter the extension bundle.
 - The model never returns or influences an allow/warn/block decision.
@@ -118,9 +123,9 @@ The MV3 manifest requests:
 - `scripting` for on-demand main-frame injection.
 - `storage` for the selected persistent source, explicit model opt-in, and random companion-service pairing capability. Imported message content, codes, and OAuth tokens are never stored there.
 - Fixed loopback host permissions for the companion (`127.0.0.1:4318`) and judge lab (`127.0.0.1:4173`).
-- Optional HTTP(S) origin patterns. Chrome grants none by default; if temporary `activeTab` access is insufficient, the popup asks for one exact origin such as `https://example.com/*` at runtime.
+- Optional HTTP(S) origin patterns. Chrome grants none by default. Manual scanning may request one exact origin if temporary `activeTab` access is insufficient; Assisted or Auto-Continue always requires an explicit exact-origin grant such as `https://example.com/*` and stores only that origin's mode.
 
-It does **not** receive permanent access to every site, or request browsing history, clipboard, password, or form-submission privileges. Chrome documents `activeTab` as temporary access granted by an explicit extension gesture and optional host permissions as runtime-granted access ([activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab), [permissions](https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions), [scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)).
+It does **not** receive permanent access to every site, or request browsing history, clipboard, password, or form-submission privileges. Trusted-site settings show the exact origin (including protocol and non-default port); revocation removes the stored rule and its origin permission. Chrome documents `activeTab` as temporary access granted by an explicit extension gesture and optional host permissions as runtime-granted access ([activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab), [permissions](https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions), [scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)).
 
 ## Optional GPT-5.6 extraction
 
@@ -172,13 +177,13 @@ The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 
 Every pull request and push to `main` runs the required `verify` status using the fast `npm run check` iteration gate. Browser installation and end-to-end checks are intentionally reserved for releases.
 
-Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.7`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
+Pushing a semantic-version tag that exactly matches `package.json` (for example, `v0.2.0-beta.8`) runs the complete `npm run verify` release gate, packages the extension and companion CLI, smoke-tests a fresh companion installation, and publishes both artifacts with separate SHA-256 files to the matching GitHub Release. Hyphenated versions are published as prereleases. An existing tag can be safely republished from the Release workflow's manual dispatch; release assets are replaced only after the full gate passes.
 
 Download verified extension packages and their checksums from [GitHub Releases](https://github.com/lzongren/contextfill/releases).
 
 ## Security and sensitive-data behavior
 
-- Candidate values from synthetic, imported, or connected sources exist only in short-lived popup variables after ingestion; imported files are never persisted by ContextFill.
+- Candidate values from synthetic, imported, or connected sources exist only in short-lived extension memory after ingestion; imported files are never persisted by ContextFill.
 - Runtime candidate state clears after fill, dismissal, explicit expiry, or at most 90 seconds.
 - Expired candidate values are removed before the blocked card is retained.
 - Successful fills and link openings mark a stable candidate ID as used for 15 minutes; no candidate value is stored in replay state.
@@ -187,7 +192,7 @@ Download verified extension packages and their checksums from [GitHub Releases](
 - Link inspection parses only local message text: it performs no request, prefetch, HEAD call, redirect resolution, or Safe Browsing lookup.
 - Links must use HTTPS and are blocked for credentials, IP/local destinations, nonstandard ports, punycode, known shorteners, opaque click/redirect wrappers, destination mismatch, staleness, or replay.
 - The extension never touches the clipboard or analytics.
-- Candidate/message data is not written to extension storage. The stored loopback capability is restricted to trusted extension contexts.
+- Candidate/message data is not written to extension storage. Auto-Continue stores exact-origin mode rules and a seven-day, 24-record activity history containing only hostname, candidate type, outcome/reason code, and time—never codes, tokens, subjects, sender addresses, bodies, or page paths. Stored data is restricted to trusted extension contexts and can be cleared or revoked.
 - User and model text enter the popup through `textContent`, not executable HTML.
 - Field mutation dispatches `input` and `change` events but never clicks or submits anything.
 - The local service rejects non-loopback/non-extension origins and oversized input.
@@ -196,13 +201,13 @@ Read the complete [threat model](docs/THREAT_MODEL.md) before treating this prot
 
 ## Accessibility and UX
 
-The popup and judge lab use semantic labels, keyboard-operable native controls, visible focus rings, textual status labels and icons in addition to color, explicit loading/empty/error/success states, reduced-motion handling, and high-contrast decision cards. Codes and references stay masked until reveal; action-link secrets remain permanently masked. Warnings require a checked acknowledgement before an eligible value-transfer override becomes available. Link warnings cannot be overridden.
+The popup, settings page, judge lab, and in-page Auto-Continue card use semantic labels, keyboard-operable native controls, visible focus rings, textual status labels and icons in addition to color, explicit waiting/found/verified/countdown/success/block/error states, reduced-motion handling, and high-contrast decision cards. The countdown is announced through an ARIA live region and exposes a visible Cancel action; removing or hiding it fails closed. Codes stay masked and action-link paths/query/fragment secrets are never shown. Warnings never enter Auto-Continue and link warnings cannot be overridden.
 
 ## Supported platforms
 
 - Chrome 114+ with Manifest V3 and unpacked-extension developer mode.
 - Node.js 20+ on macOS, Linux, or Windows for the local demo and optional service.
-- The current MVP detects fields only in the top-level document.
+- The current MVP detects dynamic top-level-document wait states, including SPA dialogs, but does not traverse iframes or closed shadow roots.
 
 ## Honest limitations
 
@@ -213,13 +218,14 @@ The popup and judge lab use semantic labels, keyboard-operable native controls, 
 - Verified handoff supports only magic-login and email-confirmation links. Password reset, account recovery, payments, document signing, URL shorteners, opaque redirect wrappers, IP/local destinations, and internationalized destinations are blocked or unsupported.
 - Lookalike detection covers exact registrable-domain mismatch plus a controlled set of Unicode, punycode, substitution, hyphen, and deceptive-label signals. It does not detect every homograph.
 - Field detection does not traverse iframes or closed shadow roots and cannot support every framework-controlled input.
-- Replay state is in a Manifest V3 service worker and may reset after browser/extension restart.
+- Replay IDs are kept in `chrome.storage.session` for 15 minutes and reset when the browser session ends or the extension is reloaded.
+- Auto-Continue dispatches ordinary `input` and `change` events. The extension never submits, but a destination page may intentionally submit in response to the last OTP digit; enabling Auto requires acknowledging this site-owned behavior.
 - Loopback requests require a one-time paired 256-bit capability plus the extension installation ID. Local malware or another process running as the user remains outside this boundary.
 - The GPT-5.6 live path requires the user's own API access and incurs normal API usage. The repository's model tests use injected responses; no live API call was made during the no-key release verification.
 
 ## How Codex was used
 
-The primary Codex session took the project from an empty Git repository through architecture, implementation, real Gmail integration, tests, browser QA, security review, packaging, and submission drafts. Codex wrote and verified the shared core, MV3 extension, demo fixtures, optional Responses API service, test suites, and documentation. Human testing on a real Vialto OTP page exposed runtime-origin permission and nonsemantic split-input gaps; Codex added exact-origin permission requests and stronger context detection. Product review then moved the differentiated core from OTP-only transfer to Verified Magic-Link Handoff, with Trusted Reference Transfer as the generalization proof.
+The primary Codex session took the project from an empty Git repository through architecture, implementation, real Gmail integration, tests, browser QA, security review, packaging, and submission drafts. Codex wrote and verified the shared core, MV3 extension, demo fixtures, optional Responses API service, test suites, and documentation. Human testing on a real Vialto OTP page exposed runtime-origin permission and nonsemantic split-input gaps; Codex added exact-origin permission requests and stronger context detection. Product review moved the differentiated core from OTP-only transfer to verified magic links, then a later iteration removed the popup interruption with Manual/Assisted/Auto modes, a visible cancellable overlay, dynamic SPA detection, execution-time revalidation, revocation, and privacy-safe activity history.
 
 The human supplied the product concept, category, deadline, security constraints, acceptance scenarios, and autonomous execution mandate. Before submission, run `/feedback` in this primary session and add the real Session ID to [Codex collaboration](docs/CODEX_COLLABORATION.md) and the Devpost draft. Do not infer the session's model metadata; confirm it from the real session record.
 
