@@ -20,7 +20,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 - The extension stores its random pairing capability, selected source, explicit model opt-in, exact-origin automation rules, session-only replay IDs, and privacy-minimized activity outcomes. The activity schema excludes codes, URLs/tokens, subjects, senders, bodies, and page paths; it keeps at most 24 records for seven days. Chrome storage is restricted to trusted extension contexts; message bodies, candidate values, provider tokens, and account authorization never enter it.
 - Real mailbox messages use deterministic local extraction by default. Sending a prefiltered real message through the optional GPT-5.6 extractor requires a separate explicit toggle in the source screen.
 - Imported `.eml` files are capped at 2 MB and parsed with explicit MIME nesting and header-size limits. HTML is converted to inert text plus HTTP(S) link evidence; scripts, styles, templates, and attachments do not enter extraction.
-- Gmail normally queries only temporary-action phrases from the last day, explicitly excludes Spam and Trash, and fetches at most 12 bodies; move a legitimate message to the inbox before scanning. The explicit easyJet booking-lookup route is a separate exception: only on the exact official booking-dialog page, it requests subjects matching `easyJet booking reference` from the last five years, still excludes Spam and Trash, strictly verifies sender/domain evidence, returns at most 12 confirmations, and requires the user to choose a masked booking. Outlook reads only the Inbox, filters 25 recent summaries locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
+- Gmail normally queries only temporary-action phrases from the last day, explicitly excludes Spam and Trash, and fetches at most 12 bodies; move a legitimate message to the inbox before scanning. Live airline booking lookup is a separate exception on exact official routes: easyJet requests `easyJet booking reference` subjects from the last five years, while Alaska requests `Your flight is booked` messages from the exact reservation sender from the last 13 months. Both exclude Spam and Trash, cap retrieval, revalidate sender/body/domain evidence locally, mask values, and require user choice. Outlook reads only the Inbox, filters 25 recent summaries locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
 - HTML-only message normalization preserves HTTPS anchor destinations as inert text. It does not load images, execute HTML, fetch destinations, or follow redirects.
 - Disconnect clears memory, deletes the keychain refresh credential, and makes a best-effort Google revocation request.
 - ContextFill still requires deterministic `allow` before any Assisted or automatic action. Auto-Continue requires explicit per-origin opt-in and shows a cancellable three-second in-page countdown; it revalidates the page and policy immediately before acting. The extension never clicks or invokes form submission, although a destination page may submit from its own input handler after the final OTP digit.
@@ -110,6 +110,16 @@ Keychain failure does not break the connector, but both pairing and provider aut
 6. ContextFill never checks the consent box or presses **Find Booking**. Do not submit during conformance testing.
 
 Apple Hide My Email forwarding is supported only when the envelope sender is an `icloud.com` relay whose local part encodes the same domain as the apparent original easyJet address. A display name alone is never sender evidence. Raw relay addresses, booking references, surnames, and message bodies are not logged or persisted.
+
+### Private Alaska Airlines booking lookup
+
+1. Open `https://www.alaskaair.com/booking/reservation-lookup` and approve only that exact origin.
+2. Select **Gmail** in ContextFill. The companion queries only recent `Your flight is booked` messages from `reservation@email.alaskaair.com`.
+3. ContextFill requires a labeled confirmation code, Alaska domain evidence, and exactly one two-part traveler name in the labeled `Traveler(s)` block. It never derives the surname from `Hi, Name` or the mailbox profile.
+4. Choose the masked booking, review the in-page trace, and transfer. The passenger-last-name and confirmation-code fields change together or neither changes; ContextFill never clicks **Continue**.
+5. Use **Undo entire handoff** to restore both fields. The capsule remains replay-marked.
+
+Multiple travelers or compound-name ambiguity intentionally block rather than guessing. The airline may independently archive completed reservations; ContextFill proves the handoff, not downstream retrieval.
 
 1. Create or choose a Google Cloud project and enable the Gmail API.
 2. Configure the OAuth consent screen. During development, keep the app in testing mode and add your own Google account as a test user.

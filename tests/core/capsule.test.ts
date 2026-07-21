@@ -46,6 +46,30 @@ const easyJetPage: CapsulePageContext = {
   simulated: false,
   scenario: null,
 };
+const alaskaMessage = {
+  id: 'gmail:alaska-synthetic',
+  source: 'gmail' as const,
+  senderName: 'Alaska Airlines Reservation',
+  senderAddress: 'reservation@email.alaskaair.com',
+  senderRelay: null,
+  subject: 'Your flight is booked: ALTEST to Seattle on 08/16/2026',
+  body: `Alaska Airlines
+Confirmation code: ALTEST
+Manage trip: https://click.email.alaskaair.com/manage
+Traveler(s):
+ZONGREN LIU
+27F · Class: L COACH
+Special information related to your trip:`,
+  receivedAt: '2026-06-06T05:08:05.000Z',
+  expiresAt: null,
+  serviceHint: 'Alaska Airlines',
+};
+const alaskaPage: CapsulePageContext = {
+  hostname: 'www.alaskaair.com',
+  serviceHint: 'Alaska Airlines',
+  simulated: false,
+  scenario: null,
+};
 
 describe('context capsule schema and extraction', () => {
   it('extracts only the two typed travel facts with a short expiry', () => {
@@ -140,6 +164,38 @@ describe('context capsule schema and extraction', () => {
       expect.objectContaining({ key: 'passenger_surname', value: 'Rivera' }),
     ]);
   });
+
+  it('extracts an Alaska surname only from one labeled traveler record', () => {
+    const capsule = extractContextCapsuleDeterministic(alaskaMessage, now)!;
+    expect(capsule.facts).toEqual([
+      expect.objectContaining({ key: 'booking_reference', value: 'ALTEST' }),
+      expect.objectContaining({ key: 'passenger_surname', value: 'LIU' }),
+    ]);
+    expect(
+      extractContextCapsuleDeterministic(
+        {
+          ...alaskaMessage,
+          body: alaskaMessage.body.replace(
+            '27F · Class: L COACH',
+            '27F · Class: L COACH\nSAMPLE RIVERA\n28A · Class: L COACH',
+          ),
+        },
+        now,
+      ),
+    ).toBeNull();
+    expect(
+      extractContextCapsuleDeterministic(
+        { ...alaskaMessage, body: alaskaMessage.body.replace('Traveler(s):', 'Hi,') },
+        now,
+      ),
+    ).toBeNull();
+    expect(
+      extractContextCapsuleDeterministic(
+        { ...alaskaMessage, body: alaskaMessage.body.replace('ALTEST', 'OTHERX') },
+        now,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe('context capsule trust authorization', () => {
@@ -198,6 +254,28 @@ describe('context capsule trust authorization', () => {
         },
         easyJetPage,
         { now, maxMessageAgeMinutes: 5 * 365 * 24 * 60 },
+      ).reasonCode,
+    ).toBe('sender_conflict');
+  });
+
+  it('authorizes the exact Alaska sender, message domain, and booking page', () => {
+    const capsule = extractContextCapsuleDeterministic(alaskaMessage, now)!;
+    expect(
+      authorizeContextCapsule(capsule, alaskaMessage, alaskaPage, {
+        now,
+        maxMessageAgeMinutes: 13 * 31 * 24 * 60,
+      }),
+    ).toMatchObject({
+      decision: 'allow',
+      reasonCode: 'aligned',
+      matchedDomain: 'click.email.alaskaair.com',
+    });
+    expect(
+      authorizeContextCapsule(
+        capsule,
+        { ...alaskaMessage, senderAddress: 'reservation@alaskaair.example' },
+        alaskaPage,
+        { now, maxMessageAgeMinutes: 13 * 31 * 24 * 60 },
       ).reasonCode,
     ).toBe('sender_conflict');
   });

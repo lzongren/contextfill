@@ -1,5 +1,24 @@
 # Test results
 
+## Local Gmail → Alaska Airlines beta.9 addendum
+
+Checked on 2026-07-21 from `codex/alaska-capsules` without publishing or merging.
+
+| Check                                        | Result                                                                                                                                       |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run verify`                             | Formatting, lint, types, 24 files / 134 tests, three builds, 10 packaged passes with 2 private specs skipped, and 12 installed-Chrome passes |
+| Opt-in `alaska-live.spec.ts`                 | 1 private Gmail pass; masked choice, two values present, zero submission, raw booking values and credential contents never printed           |
+| Packaged Alaska stability                    | 3 consecutive packaged passes after removing an invalid cross-world test-clock override                                                      |
+| `npm run package` and `npm run test:package` | beta.9 extension and companion built; clean-install help/init/setup/doctor/no-overwrite/startup/health smoke passed                          |
+| `npm audit --omit=dev`                       | 0 vulnerabilities                                                                                                                            |
+| Archive and manifest inspection              | Both archives readable; extension contains `airline-content.js`; production manifest has no standing easyJet or Alaska permission            |
+| Extension secret-name scan                   | No API-key or OAuth-client-secret identifiers found in `dist/extension`                                                                      |
+
+- Extension: `artifacts/contextfill-extension-v0.2.0-beta.9.zip` — 532,584 bytes — SHA-256 `8aa61b11b59fb007009d1e762a11c328c5b618b97a80ec278102715cb32b0a4b`
+- Companion: `artifacts/contextfill-companion-v0.2.0-beta.9.tgz` — 898,540 bytes — SHA-256 `b040417bc71e53a4b53c084654ba5117d2f7ecfd90cbf21f020ab9f06acceb54`
+
+The private gate uses the real read-only Gmail adapter and an intercepted official Alaska origin containing only the current two-field form contract. It confirms the real confirmation format survives normalization, the exact Alaska mailbox purpose excludes generic temporary-code selection, the subject/body code agrees, one labeled traveler yields the surname, and the extension transfers both fields without invoking `Continue`. It does not submit to Alaska or claim that the completed reservation remains retrievable.
+
 Final Capsule plus Gmail→easyJet candidate checked on 2026-07-21 in the local macOS workspace. The branch is based on latest `main` commit `e98473f4a10a95ef87d47ab10276cae97cad845b`, which records the independently verified beta.8 release built from product commit `8f1025007ef153b8b66c7449c4026201f73420f6`.
 
 | Check                         | Command                                                      | Result                                                                             |

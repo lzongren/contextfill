@@ -98,11 +98,14 @@ function scoreField(
     if (/\b(?:booking|reservation)\s+(?:reference|confirmation|number|code)\b/i.test(text)) {
       score += 100;
       signals.push('explicit booking-reference label');
+    } else if (/\bconfirmation code(?:\s+or\s+e-?ticket(?:\s*(?:#|number))?)?\b/i.test(text)) {
+      score += 92;
+      signals.push('airline confirmation-code label');
     } else if (/booking.*(?:ref|confirmation|code)|(?:ref|confirmation).*booking/i.test(text)) {
       score += 86;
       signals.push('booking-reference field identifier');
     }
-  } else if (/\bpassenger\s+(?:surname|last name)\b/i.test(text)) {
+  } else if (/\bpassenger(?:'s|’s|s')?\s+(?:surname|last name)\b/i.test(text)) {
     score += 100;
     signals.push('explicit passenger-surname label');
   } else if (/\b(?:surname|family name)\b/i.test(text)) {

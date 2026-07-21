@@ -2,6 +2,12 @@
 
 ## 2026-07-21
 
+- [x] Added an explicit Gmail → Alaska Airlines Capsule path for the exact official Manage Reservation route, using a 13-month sender/subject-bounded mailbox query instead of the generic 15-minute code workflow.
+- [x] Added strict Alaska confirmation validation and deterministic extraction from a labeled confirmation code plus exactly one two-part name in the `Traveler(s)` section; greetings, ambiguous travelers, spoofed senders, and unrelated messages fail closed.
+- [x] Added Alaska field mapping for `Passenger's last name` and `Confirmation code or e-ticket #`, with action-time policy/DOM revalidation, atomic two-field transfer, no-submit receipt, replay marking, and Undo.
+- [x] Added unit, service, exact-origin, and packaged-extension regressions proving an unrelated Tennis Express candidate is not offered and the Alaska form is never submitted.
+- [x] Passed the beta.9 release gate (134 unit/integration, 10 default packaged, 12 installed-Chrome), a separate private Gmail → Alaska conformance run, three-repeat packaged stability check, companion clean-install smoke, archive/permission/secret-name inspection, and a zero-vulnerability production audit.
+- [x] Produced local beta.9 extension and companion artifacts without merging, publishing, or adding standing production access to either airline domain.
 - [x] Corrected the live easyJet greeting-name false positive: `Hi, Zongren` is no longer treated as a passenger surname when the confirmation does not state one.
 - [x] Added a masked, user-selected easyJet reference-only fallback that verifies the Apple relay/domain/origin and historical lookup window, fills only the booking reference, leaves surname and consent manual, and never submits.
 - [x] Added the isolated private Gmail → easyJet path: purpose-bounded historical confirmation retrieval, explicit labeled-surname extraction, strict Apple Hide My Email relay evidence, and masked user choice across multiple bookings.

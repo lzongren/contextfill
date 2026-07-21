@@ -9,6 +9,7 @@ import { AutoContinueOverlay } from './auto-continue-overlay.js';
 import type { BackgroundRequest } from './shared/messages.js';
 import type { ContentRequest, ContentResponse } from './shared/messages.js';
 import { isAllowedEasyJetBookingPage } from './easyjet-policy.js';
+import { liveAirlineForUrl } from './live-airline-policy.js';
 
 const overlay = new AutoContinueOverlay(document);
 
@@ -20,13 +21,13 @@ function scanPage(): PageContext {
   const target = findContextField(document);
   const isLoopback = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
   const simulatedHostname = isLoopback ? fixtureMeta('contextfill-simulated-host') : null;
+  const liveAirline = isLoopback ? null : liveAirlineForUrl(window.location.href);
   return {
     hostname: simulatedHostname ?? window.location.hostname,
     serviceHint: isLoopback
       ? fixtureMeta('contextfill-service')
-      : isAllowedEasyJetBookingPage(window.location.href)
-        ? 'easyJet'
-        : null,
+      : (liveAirline?.serviceHint ??
+        (isAllowedEasyJetBookingPage(window.location.href) ? 'easyJet' : null)),
     simulated: Boolean(simulatedHostname),
     scenario: isLoopback ? fixtureMeta('contextfill-scenario') : null,
     fieldKind: target?.kind ?? 'none',

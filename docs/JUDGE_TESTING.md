@@ -58,6 +58,20 @@ Open [the capsule lookalike](http://127.0.0.1:4173/?scenario=capsule-lookalike).
 
 The packaged Capsule entry also uses a closed activation allowlist: only the root path on the exact judge/test origins `127.0.0.1:4173` and `127.0.0.1:4179` plus known scenario/host/service tuples may mount it. Arbitrary loopback pages fail closed.
 
+### Optional private Gmail → Alaska Airlines path
+
+This is user-owned conformance evidence, not part of the public judge flow:
+
+1. Connect Gmail through the loopback companion and select **Gmail** as the message source.
+2. Open `https://www.alaskaair.com/booking/reservation-lookup` and grant that exact origin if Chrome asks.
+3. Open ContextFill. It uses the Alaska-only historical query and must not show unrelated temporary-code mail.
+4. Choose the masked Alaska confirmation, then **Review verified transfer**.
+5. Confirm the trace maps exactly `Booking reference` to `Confirmation code or e-ticket #` and `Passenger surname` to `Passenger's last name`.
+6. Choose **Transfer 2 verified facts**. Confirm both fields change, the receipt says **Form not submitted**, and the page's **Continue** button remains untouched.
+7. Choose **Undo entire handoff**. Both fields return to their prior values while replay remains marked.
+
+The path accepts only the exact official reservation route and one unambiguous traveler record from a verified Alaska reservation message. It does not claim that a completed itinerary remains retrievable after manual submission.
+
 ## 5. Recommended wow path B — Verified Auto-Continue
 
 1. Open the [single-field OTP fixture](http://127.0.0.1:4173/?scenario=legitimate-single), then open ContextFill once.

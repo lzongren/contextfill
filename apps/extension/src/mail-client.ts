@@ -8,7 +8,11 @@ export const mailSourceSchema = z.enum(['synthetic', 'gmail', 'outlook', 'import
 export type MailProvider = z.infer<typeof mailProviderSchema>;
 export type MailSource = z.infer<typeof mailSourceSchema>;
 export type PersistentMailSource = Exclude<MailSource, 'import'>;
-export const mailboxPurposeSchema = z.enum(['temporary_action', 'easyjet_booking_lookup']);
+export const mailboxPurposeSchema = z.enum([
+  'temporary_action',
+  'easyjet_booking_lookup',
+  'alaska_booking_lookup',
+]);
 export type MailboxPurpose = z.infer<typeof mailboxPurposeSchema>;
 
 const providerStatusSchema = z

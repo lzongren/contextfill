@@ -78,6 +78,26 @@ describe('capsule field mapping and transaction', () => {
     expect(textInputs.map((input) => input.value)).toEqual(['', '']);
   });
 
+  it('maps Alaska passenger and confirmation labels without submitting the reservation form', () => {
+    document.body.innerHTML = `<form action="https://www.alaskaair.com/booking/reservation-lookup">
+      <label>Passenger's last name<input type="text" data-contextfill-visible="true"></label>
+      <label>Confirmation code or e-ticket #<input type="text" data-contextfill-visible="true"></label>
+      <button type="submit">Continue</button>
+    </form>`;
+    const form = document.querySelector('form')!;
+    const submitted = vi.fn();
+    form.addEventListener('submit', submitted);
+    const policy = authorizeContextCapsule(capsule, message, page, { now });
+    const plan = createCapsuleMappingPlan(document, capsule);
+    expect(plan).toMatchObject({ decision: 'ready', reasonCode: 'mapped' });
+    const receipt = executeContextCapsuleTransfer(capsule, policy, plan)!;
+    const inputs = [...document.querySelectorAll<HTMLInputElement>('input')];
+    expect(inputs.map((input) => input.value)).toEqual(['Rivera', 'AU-47K2']);
+    expect(submitted).not.toHaveBeenCalled();
+    expect(receipt.undo()).toBe(true);
+    expect(inputs.map((input) => input.value)).toEqual(['', '']);
+  });
+
   it('ignores a hidden decoy and refuses ambiguous, sensitive, or non-empty targets', () => {
     renderFields('<label hidden>Booking reference<input name="hiddenBooking" hidden></label>');
     expect(createCapsuleMappingPlan(document, capsule).decision).toBe('ready');

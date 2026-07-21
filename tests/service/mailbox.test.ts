@@ -80,6 +80,33 @@ function gmailEasyJetMessage(
   };
 }
 
+function gmailAlaskaMessage(
+  id = 'gmail-alaska',
+  from = 'Alaska Airlines Reservation <reservation@email.alaskaair.com>',
+) {
+  return {
+    id,
+    internalDate: String(new Date('2026-06-06T05:08:05.000Z').getTime()),
+    snippet: 'Your Alaska Airlines flight is booked.',
+    payload: {
+      mimeType: 'text/plain',
+      headers: [
+        { name: 'From', value: from },
+        { name: 'Subject', value: 'Your flight is booked: ALTEST to Seattle on 08/16/2026' },
+      ],
+      body: {
+        data: encoded(`Alaska Airlines
+Confirmation code: ALTEST
+Manage trip: https://click.email.alaskaair.com/manage
+Traveler(s):
+ZONGREN LIU
+27F · Class: L COACH
+Special information related to your trip:`),
+      },
+    },
+  };
+}
+
 function outlookMessage(id = 'outlook-message-1') {
   return {
     id,
@@ -332,6 +359,64 @@ describe('mailbox OAuth and provider adapters', () => {
     const messages = await manager.listMessages('gmail', 'easyjet_booking_lookup');
     expect(messages).toHaveLength(1);
     expect(messages[0]).toMatchObject({ serviceHint: 'easyJet', id: 'gmail:gmail-easyjet' });
+  });
+
+  it('uses a bounded Alaska query and excludes unrelated or spoofed messages', async () => {
+    const credentialStore = new FakeCredentialStore();
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === 'https://oauth2.googleapis.com/token') {
+        return Response.json({ access_token: 'google-access', refresh_token: 'google-refresh' });
+      }
+      if (url.endsWith('/users/me/profile')) {
+        return Response.json({ emailAddress: 'person@gmail.example' });
+      }
+      if (url.includes('/users/me/messages?')) {
+        const query = new URL(url).searchParams.get('q');
+        expect(query).toBe(
+          'newer_than:13m -in:spam -in:trash from:reservation@email.alaskaair.com subject:"Your flight is booked"',
+        );
+        return Response.json({
+          messages: [{ id: 'gmail-alaska' }, { id: 'gmail-forged-alaska' }, { id: 'gmail-tennis' }],
+        });
+      }
+      if (url.includes('/users/me/messages/gmail-alaska?format=full')) {
+        return Response.json(gmailAlaskaMessage());
+      }
+      if (url.includes('/users/me/messages/gmail-forged-alaska?format=full')) {
+        return Response.json(
+          gmailAlaskaMessage(
+            'gmail-forged-alaska',
+            'Alaska Airlines Reservation <reservation@alaskaair.example>',
+          ),
+        );
+      }
+      if (url.includes('/users/me/messages/gmail-tennis?format=full')) {
+        return Response.json(gmailMessage('gmail-tennis'));
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const manager = new MailboxManager(
+      {
+        CONTEXTFILL_GOOGLE_CLIENT_ID: 'google-client',
+        CONTEXTFILL_GOOGLE_CLIENT_SECRET: 'google-secret',
+      },
+      fetcher as typeof fetch,
+      () => now.getTime(),
+      credentialStore,
+    );
+    const authorizationUrl = new URL(await manager.beginConnection('gmail'));
+    await manager.completeConnection(
+      'gmail',
+      'authorization-code',
+      authorizationUrl.searchParams.get('state')!,
+    );
+    const messages = await manager.listMessages('gmail', 'alaska_booking_lookup');
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      serviceHint: 'Alaska Airlines',
+      id: 'gmail:gmail-alaska',
+    });
   });
 
   it('restores a refresh token from the OS keychain and refreshes on first use', async () => {

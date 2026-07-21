@@ -45,7 +45,8 @@ import type {
 } from './shared/messages.js';
 import { isMissingHostPermission, siteAccessRequest } from './site-access.js';
 import { performVerifiedNavigation } from './verified-navigation.js';
-import { EASYJET_MAX_MESSAGE_AGE_MINUTES, isAllowedEasyJetBookingPage } from './easyjet-policy.js';
+import { EASYJET_MAX_MESSAGE_AGE_MINUTES } from './easyjet-policy.js';
+import { liveAirlineForUrl, type LiveAirlineProfile } from './live-airline-policy.js';
 
 const app = document.querySelector<HTMLElement>('#app')!;
 const mailboxSetupGuide =
@@ -63,7 +64,7 @@ let importedMessages: MailboxMessage[] = [];
 let realMailModelOptIn = false;
 let viewGeneration = 0;
 
-type EasyJetChoice = {
+type AirlineChoice = {
   capsule: ContextCapsule;
   message: MailboxMessage;
 };
@@ -879,15 +880,22 @@ async function fillSelected(warningOverride: boolean): Promise<void> {
   }
 }
 
-async function openEasyJetChoice(tabId: number, choice: EasyJetChoice): Promise<void> {
+async function openAirlineChoice(
+  tabId: number,
+  profile: LiveAirlineProfile,
+  choice: AirlineChoice,
+): Promise<void> {
   try {
     const tab = await chrome.tabs.get(tabId);
-    if (!isAllowedEasyJetBookingPage(tab.url)) {
-      throw new Error('The initiating tab is no longer the approved easyJet booking page.');
+    if (!profile.isAllowedBookingPage(tab.url)) {
+      throw new Error(
+        `The initiating tab is no longer the approved ${profile.displayName} booking page.`,
+      );
     }
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['easyjet-content.js'] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['airline-content.js'] });
     const response = await contentMessage(tabId, {
-      type: 'SHOW_EASYJET_CAPSULE',
+      type: 'SHOW_AIRLINE_CAPSULE',
+      airline: profile.id,
       capsule: choice.capsule,
       message: choice.message,
     });
@@ -899,21 +907,22 @@ async function openEasyJetChoice(tabId: number, choice: EasyJetChoice): Promise<
   } catch (error) {
     renderMessage(
       'error',
-      'Could not open the easyJet capsule',
+      `Could not open the ${profile.displayName} capsule`,
       error instanceof Error ? error.message : 'The page changed before review.',
     );
   }
 }
 
-async function renderEasyJetChoices(
+async function renderAirlineChoices(
   messages: MailboxMessage[],
   tabId: number,
   page: PageContext,
+  profile: LiveAirlineProfile,
 ): Promise<boolean> {
   const now = new Date();
   const capsulePage = capsulePageContextSchema.parse({
     hostname: page.hostname,
-    serviceHint: 'easyJet',
+    serviceHint: profile.serviceHint,
     simulated: false,
     scenario: null,
   });
@@ -925,7 +934,7 @@ async function renderEasyJetChoices(
     (
       capsule,
     ): Array<{
-      choice: EasyJetChoice;
+      choice: AirlineChoice;
       decision: ReturnType<typeof authorizeContextCapsule>;
     }> => {
       const message = messages.find((candidate) => candidate.id === capsule.messageId);
@@ -936,7 +945,7 @@ async function renderEasyJetChoices(
           decision: authorizeContextCapsule(capsule, message, capsulePage, {
             now,
             usedCapsuleIds,
-            maxMessageAgeMinutes: EASYJET_MAX_MESSAGE_AGE_MINUTES,
+            maxMessageAgeMinutes: profile.maxMessageAgeMinutes,
           }),
         },
       ];
@@ -946,21 +955,21 @@ async function renderEasyJetChoices(
   if (allowed.length === 0) {
     const explanation =
       evaluated[0]?.decision.reason ??
-      'No easyJet confirmation contained both a booking reference and passenger surname with matching sender and domain evidence.';
-    renderMessage('empty', 'No verified easyJet booking found', explanation);
+      `No ${profile.displayName} confirmation contained both a booking reference and passenger surname with matching sender and domain evidence.`;
+    renderMessage('empty', `No verified ${profile.displayName} booking found`, explanation);
     return true;
   }
 
   selected = null;
   const { body } = shell();
   body.append(
-    element('p', 'kicker', 'Gmail → easyJet'),
+    element('p', 'kicker', `Gmail → ${profile.displayName}`),
     element('h1', '', allowed.length === 1 ? 'Choose this booking' : 'Choose a booking'),
     element(
       'p',
       'muted',
       allowed.length === 1
-        ? 'ContextFill found one confirmation that matches this official easyJet booking page.'
+        ? `ContextFill found one confirmation that matches this official ${profile.displayName} booking page.`
         : 'ContextFill found several matching confirmations. It will not choose between different bookings automatically.',
     ),
   );
@@ -975,7 +984,9 @@ async function renderEasyJetChoices(
     const sender = element(
       'p',
       'muted capsule-choice__sender',
-      choice.message.senderRelay ? 'easyJet · verified Apple Hide My Email relay' : 'easyJet',
+      choice.message.senderRelay && profile.id === 'easyjet'
+        ? 'easyJet · verified Apple Hide My Email relay'
+        : `${profile.displayName} · verified Gmail sender`,
     );
     const facts = element('div', 'capsule-choice__facts');
     for (const fact of choice.capsule.facts) {
@@ -992,7 +1003,7 @@ async function renderEasyJetChoices(
     }
     const use = element('button', 'button button--primary', 'Review verified transfer');
     use.type = 'button';
-    use.addEventListener('click', () => void openEasyJetChoice(tabId, choice));
+    use.addEventListener('click', () => void openAirlineChoice(tabId, profile, choice));
     card.append(heading, sender, facts, use);
     list.append(card);
   }
@@ -1001,7 +1012,7 @@ async function renderEasyJetChoices(
     element(
       'p',
       'extraction-note',
-      'Deterministic extraction · exact easyJet origin · values stay masked until transfer · never submits',
+      `Deterministic extraction · exact ${profile.displayName} origin · values stay masked until transfer · never submits`,
     ),
   );
   return true;
@@ -1091,7 +1102,7 @@ async function scan(): Promise<void> {
     if (!response.ok || !response.page)
       throw new Error(response.ok ? 'Page context was unavailable.' : response.error);
     const page = pageContextSchema.parse(response.page);
-    const easyJetLive = mailSource === 'gmail' && isAllowedEasyJetBookingPage(tab.url);
+    const liveAirline = mailSource === 'gmail' ? liveAirlineForUrl(tab.url) : null;
     const messages =
       mailSource === 'synthetic'
         ? messagesForScenario(page.scenario)
@@ -1099,12 +1110,18 @@ async function scan(): Promise<void> {
           ? importedMessages
           : await fetchMailboxMessages(
               mailSource,
-              easyJetLive ? 'easyjet_booking_lookup' : 'temporary_action',
+              liveAirline?.mailboxPurpose ?? 'temporary_action',
             );
-    if (easyJetLive) {
-      const renderedCapsule = await renderEasyJetChoices(messages, tab.id!, page);
-      if (!renderedCapsule) {
+    if (liveAirline) {
+      const renderedCapsule = await renderAirlineChoices(messages, tab.id!, page, liveAirline);
+      if (!renderedCapsule && liveAirline.allowsReferenceOnly) {
         await renderEasyJetReferenceChoices(messages, tab.id!, tab.url ?? '', page);
+      } else if (!renderedCapsule) {
+        renderMessage(
+          'empty',
+          `No verified ${liveAirline.displayName} booking found`,
+          `No ${liveAirline.displayName} confirmation contained an unambiguous confirmation code and passenger surname with matching sender and domain evidence.`,
+        );
       }
       return;
     }

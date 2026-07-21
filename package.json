@@ -1,6 +1,6 @@
 {
   "name": "contextfill",
-  "version": "0.2.0-beta.8",
+  "version": "0.2.0-beta.9",
   "private": true,
   "description": "Verified magic-link handoff with deterministic message, destination, and site trust checks.",
   "type": "module",
@@ -22,7 +22,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test",
-    "test:extension": "playwright test --config playwright.extension.config.ts",
+    "test:extension": "CONTEXTFILL_TEST_AIRLINE_HOSTS=1 npm run build:extension && playwright test --config playwright.extension.config.ts",
     "package": "npm run package:extension && npm run package:service",
     "package:extension": "npm run build:extension && node scripts/package-extension.mjs",
     "package:service": "npm run build:service && node scripts/package-service.mjs",

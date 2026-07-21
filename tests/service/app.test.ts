@@ -120,6 +120,12 @@ describe('local extraction service', () => {
     expect(easyJet.status).toBe(200);
     expect(mailbox.listMessages).toHaveBeenLastCalledWith('gmail', 'easyjet_booking_lookup');
 
+    const alaska = await app.request('/mail/messages/gmail?purpose=alaska_booking_lookup', {
+      headers: { origin: 'chrome-extension://abcdefghijklmnopabcdefghijklmnop' },
+    });
+    expect(alaska.status).toBe(200);
+    expect(mailbox.listMessages).toHaveBeenLastCalledWith('gmail', 'alaska_booking_lookup');
+
     const otherExtension = await app.request('/mail/messages/gmail', {
       headers: { origin: 'chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba' },
     });

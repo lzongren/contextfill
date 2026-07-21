@@ -15,7 +15,7 @@ const entries = [
   ['src/background.ts', 'background.js'],
   ['src/options.ts', 'options.js'],
   ['src/capsule-content.ts', 'capsule-content.js'],
-  ['src/easyjet-content.ts', 'easyjet-content.js'],
+  ['src/airline-content.ts', 'airline-content.js'],
 ];
 
 for (const [entry, outfile] of entries) {
@@ -38,9 +38,17 @@ await cp(resolve(extensionRoot, 'options.html'), resolve(outdir, 'options.html')
 await cp(resolve(extensionRoot, 'options.css'), resolve(outdir, 'options.css'));
 
 const manifest = JSON.parse(await readFile(resolve(extensionRoot, 'manifest.json'), 'utf8'));
-if (process.env.CONTEXTFILL_TEST_EASYJET_HOST === '1') {
+if (
+  process.env.CONTEXTFILL_TEST_EASYJET_HOST === '1' ||
+  process.env.CONTEXTFILL_TEST_AIRLINE_HOSTS === '1'
+) {
   manifest.host_permissions = [
     ...new Set([...(manifest.host_permissions ?? []), 'https://www.easyjet.com/*']),
+  ];
+}
+if (process.env.CONTEXTFILL_TEST_AIRLINE_HOSTS === '1') {
+  manifest.host_permissions = [
+    ...new Set([...(manifest.host_permissions ?? []), 'https://www.alaskaair.com/*']),
   ];
 }
 await writeFile(resolve(outdir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);

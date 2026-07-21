@@ -8,7 +8,7 @@ import {
   mountContextCapsuleOverlay,
   type CapsuleTransferReceipt,
 } from '../../../packages/core/src/index.js';
-import { EASYJET_MAX_MESSAGE_AGE_MINUTES, isAllowedEasyJetBookingPage } from './easyjet-policy.js';
+import { liveAirlineProfile } from './live-airline-policy.js';
 import type {
   BackgroundRequest,
   BackgroundResponse,
@@ -25,18 +25,19 @@ async function usedCapsuleIds(): Promise<Set<string>> {
   return new Set(response.ok ? response.candidateIds : []);
 }
 
-async function showEasyJetCapsule(
-  request: Extract<ContentRequest, { type: 'SHOW_EASYJET_CAPSULE' }>,
+async function showAirlineCapsule(
+  request: Extract<ContentRequest, { type: 'SHOW_AIRLINE_CAPSULE' }>,
 ): Promise<'shown' | 'invalid_payload' | 'wrong_page'> {
   const capsuleResult = contextCapsuleSchema.safeParse(request.capsule);
   const messageResult = mailboxMessageSchema.safeParse(request.message);
   if (!capsuleResult.success || !messageResult.success) return 'invalid_payload';
-  if (!isAllowedEasyJetBookingPage(window.location.href)) return 'wrong_page';
+  const profile = liveAirlineProfile(request.airline);
+  if (!profile.isAllowedBookingPage(window.location.href)) return 'wrong_page';
   const capsule = capsuleResult.data;
   const message = messageResult.data;
   const page = capsulePageContextSchema.parse({
     hostname: window.location.hostname,
-    serviceHint: 'easyJet',
+    serviceHint: profile.serviceHint,
     simulated: false,
     scenario: null,
   });
@@ -44,7 +45,7 @@ async function showEasyJetCapsule(
   const policy = authorizeContextCapsule(capsule, message, page, {
     now: new Date(),
     usedCapsuleIds: initialUsedIds,
-    maxMessageAgeMinutes: EASYJET_MAX_MESSAGE_AGE_MINUTES,
+    maxMessageAgeMinutes: profile.maxMessageAgeMinutes,
   });
   const plan = createCapsuleMappingPlan(document, capsule);
   mountContextCapsuleOverlay(document, {
@@ -53,21 +54,24 @@ async function showEasyJetCapsule(
     page,
     policy,
     plan,
-    sourceLabel: message.senderRelay ? 'Gmail · Apple Hide My Email relay' : 'Gmail',
+    sourceLabel:
+      message.senderRelay && profile.id === 'easyjet'
+        ? 'Gmail · Apple Hide My Email relay'
+        : 'Gmail',
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     onTransfer: async (): Promise<CapsuleTransferReceipt | null> => {
-      if (!isAllowedEasyJetBookingPage(window.location.href)) return null;
+      if (!profile.isAllowedBookingPage(window.location.href)) return null;
       const actionUsedIds = await usedCapsuleIds();
       const actionPage = capsulePageContextSchema.parse({
         hostname: window.location.hostname,
-        serviceHint: 'easyJet',
+        serviceHint: profile.serviceHint,
         simulated: false,
         scenario: null,
       });
       const actionPolicy = authorizeContextCapsule(capsule, message, actionPage, {
         now: new Date(),
         usedCapsuleIds: actionUsedIds,
-        maxMessageAgeMinutes: EASYJET_MAX_MESSAGE_AGE_MINUTES,
+        maxMessageAgeMinutes: profile.maxMessageAgeMinutes,
       });
       const actionPlan = createCapsuleMappingPlan(document, capsule);
       const receipt = executeContextCapsuleTransfer(
@@ -91,12 +95,13 @@ async function showEasyJetCapsule(
   return 'shown';
 }
 
-if (!window.__contextfillEasyJetInstalled) {
-  window.__contextfillEasyJetInstalled = true;
+if (!window.__contextfillAirlineInstalled) {
+  window.__contextfillAirlineInstalled = true;
   chrome.runtime.onMessage.addListener(
     (request: ContentRequest, _sender, sendResponse: (response: ContentResponse) => void) => {
-      if (request.type !== 'SHOW_EASYJET_CAPSULE') return false;
-      void showEasyJetCapsule(request)
+      if (request.type !== 'SHOW_AIRLINE_CAPSULE') return false;
+      const profile = liveAirlineProfile(request.airline);
+      void showAirlineCapsule(request)
         .then((result) =>
           sendResponse(
             result === 'shown'
@@ -105,13 +110,16 @@ if (!window.__contextfillEasyJetInstalled) {
                   ok: false,
                   error:
                     result === 'wrong_page'
-                      ? 'The tab is not the approved easyJet booking route.'
-                      : 'The easyJet capsule payload failed strict validation.',
+                      ? `The tab is not the approved ${profile.displayName} booking route.`
+                      : `The ${profile.displayName} capsule payload failed strict validation.`,
                 },
           ),
         )
         .catch(() =>
-          sendResponse({ ok: false, error: 'The easyJet booking page changed before review.' }),
+          sendResponse({
+            ok: false,
+            error: `The ${profile.displayName} booking page changed before review.`,
+          }),
         );
       return true;
     },
@@ -120,6 +128,6 @@ if (!window.__contextfillEasyJetInstalled) {
 
 declare global {
   interface Window {
-    __contextfillEasyJetInstalled?: boolean;
+    __contextfillAirlineInstalled?: boolean;
   }
 }

@@ -71,6 +71,31 @@ function fact(
   return { key, value: value.trim(), confidence, supportingText: [excerpt(body, value)] };
 }
 
+function alaskaBookingReference(message: MailboxMessage): string | null {
+  if (message.serviceHint?.toLocaleLowerCase() !== 'alaska airlines') return null;
+  const subjectCode = message.subject.match(/^Your flight is booked:\s*([A-Z]{6})\b/i)?.[1];
+  if (!subjectCode || !message.body.toLocaleUpperCase().includes(subjectCode.toLocaleUpperCase())) {
+    return null;
+  }
+  return subjectCode.toUpperCase();
+}
+
+function alaskaTravelerSurname(message: MailboxMessage): string | null {
+  if (message.serviceHint?.toLocaleLowerCase() !== 'alaska airlines') return null;
+  const travelerBlock = message.body.match(
+    /\bTraveler\(s\):\s*\n+([\s\S]{1,1000}?)(?=\n+\s*Special information\b)/iu,
+  )?.[1];
+  if (!travelerBlock) return null;
+  const travelerNames = travelerBlock
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => /^[\p{L}\p{M}'’ -]{3,160}$/u.test(line) && /\s/u.test(line));
+  if (travelerNames.length !== 1) return null;
+  const nameParts = travelerNames[0]!.split(/\s+/).filter(Boolean);
+  if (nameParts.length !== 2) return null;
+  return nameParts[1] ?? null;
+}
+
 export function extractContextCapsuleDeterministic(
   messageInput: MailboxMessage,
   now = new Date(),
@@ -80,8 +105,10 @@ export function extractContextCapsuleDeterministic(
   const message = parsed.data;
   const text = `${message.subject}\n${message.body}`;
   if (!travelLanguage.test(text)) return null;
-  const bookingReference = text.match(bookingReferencePattern)?.[1]?.toUpperCase();
-  const passengerSurname = text.match(passengerSurnamePattern)?.[1];
+  const bookingReference =
+    text.match(bookingReferencePattern)?.[1]?.toUpperCase() ?? alaskaBookingReference(message);
+  const passengerSurname =
+    text.match(passengerSurnamePattern)?.[1] ?? alaskaTravelerSurname(message);
   if (!bookingReference || !passengerSurname) return null;
   return contextCapsuleSchema.parse({
     id: `capsule:${message.id}`,

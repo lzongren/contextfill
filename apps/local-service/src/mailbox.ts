@@ -9,7 +9,11 @@ import {
 
 export const mailProviderSchema = z.enum(['gmail', 'outlook']);
 export type MailProvider = z.infer<typeof mailProviderSchema>;
-export const mailboxPurposeSchema = z.enum(['temporary_action', 'easyjet_booking_lookup']);
+export const mailboxPurposeSchema = z.enum([
+  'temporary_action',
+  'easyjet_booking_lookup',
+  'alaska_booking_lookup',
+]);
 export type MailboxPurpose = z.infer<typeof mailboxPurposeSchema>;
 
 export type MailProviderStatus = {
@@ -392,6 +396,19 @@ function isVerifiedEasyJetBookingMessage(message: MailboxMessage): boolean {
   );
 }
 
+function isVerifiedAlaskaBookingMessage(message: MailboxMessage): boolean {
+  const sender = effectiveSenderAddress(message)?.toLowerCase();
+  const text = `${message.subject}\n${message.body}`;
+  return (
+    sender === 'reservation@email.alaskaair.com' &&
+    /^Your flight is booked:\s*[A-Z]{6}\b/i.test(message.subject) &&
+    /\bconfirmation code\b/i.test(message.body) &&
+    /\btraveler\(s\):/i.test(message.body) &&
+    /\bAlaska Airlines\b/i.test(message.body) &&
+    /\b(?:[a-z0-9-]+\.)*alaskaair\.com\b/i.test(text)
+  );
+}
+
 export function normalizeGmailMessage(input: unknown): MailboxMessage | null {
   const parsed = gmailMessageSchema.safeParse(input);
   if (!parsed.success) return null;
@@ -561,7 +578,7 @@ export class MailboxManager implements MailboxManagerLike {
   ): Promise<MailboxMessage[]> {
     await this.initialize();
     if (provider === 'gmail') return this.listGmailMessages(purpose);
-    if (purpose === 'easyjet_booking_lookup') return [];
+    if (purpose !== 'temporary_action') return [];
     return this.listOutlookMessages();
   }
 
@@ -765,7 +782,9 @@ export class MailboxManager implements MailboxManagerLike {
       'q',
       purpose === 'easyjet_booking_lookup'
         ? 'newer_than:5y -in:spam -in:trash subject:"easyJet booking reference"'
-        : 'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
+        : purpose === 'alaska_booking_lookup'
+          ? 'newer_than:13m -in:spam -in:trash from:reservation@email.alaskaair.com subject:"Your flight is booked"'
+          : 'newer_than:1d {verification "security code" "sign-in code" "login code" OTP "one-time" passcode "access code" "confirmation code" 2FA "magic link" "secure access link" "sign-in link" "login link" "sign in to" "log in to" "click the link" "confirm your email" "verify your email" "verify email" "email confirmation" "activate your account" "booking reference" "application reference" "support reference"}',
     );
     const listResponse = await this.providerFetch('gmail', listUrl.toString());
     const list = (await listResponse.json()) as { messages?: Array<{ id?: unknown }> };
@@ -785,6 +804,12 @@ export class MailboxManager implements MailboxManagerLike {
       return normalized
         .filter(isVerifiedEasyJetBookingMessage)
         .map((message) => ({ ...message, serviceHint: 'easyJet' }))
+        .slice(0, 12);
+    }
+    if (purpose === 'alaska_booking_lookup') {
+      return normalized
+        .filter(isVerifiedAlaskaBookingMessage)
+        .map((message) => ({ ...message, serviceHint: 'Alaska Airlines' }))
         .slice(0, 12);
     }
     return normalized.slice(0, 10);

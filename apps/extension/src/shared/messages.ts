@@ -4,6 +4,7 @@ import type {
   PageContext,
 } from '../../../../packages/core/src/index.js';
 import type { ActivityRecord, AutomationMode, AutomationSiteRule } from '../automation-settings.js';
+import type { LiveAirlineId } from '../live-airline-policy.js';
 
 export type AutomaticPageSignal = {
   intents: Array<'otp' | 'magic_link'>;
@@ -31,7 +32,8 @@ export type ContentRequest =
   | { type: 'SHOW_AUTOMATION_OVERLAY'; view: AutomationOverlayView }
   | { type: 'HIDE_AUTOMATION_OVERLAY' }
   | {
-      type: 'SHOW_EASYJET_CAPSULE';
+      type: 'SHOW_AIRLINE_CAPSULE';
+      airline: LiveAirlineId;
       capsule: ContextCapsule;
       message: MailboxMessage;
     };
