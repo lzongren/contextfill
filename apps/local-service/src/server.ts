@@ -6,7 +6,9 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { createServiceApp } from './app.js';
 import {
+  configureGmailFromCredentials,
   configureOutlook,
+  gmailSetupInstructions,
   helpText,
   initializeConfig,
   inspectCompanionReadiness,
@@ -34,11 +36,10 @@ if (isEntrypoint()) {
   } else if (process.argv.includes('--setup')) {
     const setupIndex = process.argv.indexOf('--setup');
     const provider = process.argv[setupIndex + 1];
-    if (provider !== 'outlook') {
-      console.error('Usage: contextfill-service --setup outlook [--tenant common]');
-      console.error('Gmail setup still uses the private .env flow documented in --help.');
+    if (provider !== 'outlook' && provider !== 'gmail') {
+      console.error('Usage: contextfill-service --setup <gmail|outlook> [options]');
       process.exitCode = 1;
-    } else {
+    } else if (provider === 'outlook') {
       const prompt = createInterface({ input: stdin, output: stdout });
       try {
         console.log(outlookSetupInstructions());
@@ -60,6 +61,29 @@ if (isEntrypoint()) {
         process.exitCode = 1;
       } finally {
         prompt.close();
+      }
+    } else {
+      try {
+        console.log(gmailSetupInstructions());
+        const credentialsIndex = process.argv.indexOf('--credentials');
+        if (credentialsIndex === -1) {
+          console.log('');
+          console.log('Download the web-client JSON, then rerun with --credentials <path>.');
+        } else {
+          const credentials = process.argv[credentialsIndex + 1] ?? '';
+          if (!credentials) throw new Error('--credentials requires a JSON file path.');
+          const result = await configureGmailFromCredentials(
+            process.cwd(),
+            credentials,
+            process.env,
+          );
+          console.log(`Saved Gmail settings to ${result.output} with owner-only permissions.`);
+          console.log(result.report.text);
+          if (!result.report.ok) process.exitCode = 1;
+        }
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : 'Could not save Gmail setup.');
+        process.exitCode = 1;
       }
     }
   } else if (process.argv.includes('--doctor')) {

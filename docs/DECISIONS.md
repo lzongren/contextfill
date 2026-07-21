@@ -56,4 +56,12 @@ Provider registration errors should be detected before the user reaches a consen
 
 ## D-014: Outlook registration gets a guided local setup path
 
-Microsoft public-client registrations do not use a client secret, so the companion may safely guide the registration and accept the public Application (client) ID. `--setup outlook` derives its callback and delegated permissions from runtime configuration, validates the UUID and tenant, updates only the Microsoft keys, removes duplicate assignments, preserves unrelated settings, locks `.env` to owner-only permissions, and runs the doctor without echoing the ID. Gmail remains a manual private-file flow until its client secret can be collected without terminal echo or command-history exposure.
+Microsoft public-client registrations do not use a client secret, so the companion may safely guide the registration and accept the public Application (client) ID. `--setup outlook` derives its callback and delegated permissions from runtime configuration, validates the UUID and tenant, updates only the Microsoft keys, removes duplicate assignments, preserves unrelated settings, locks `.env` to owner-only permissions, and runs the doctor without echoing the ID.
+
+## D-015: Registration ownership is distinct from supported sign-in accounts
+
+Setting the Microsoft authority to `common` lets a correctly registered application accept personal and organizational accounts; it does not grant a standalone personal Outlook.com account permission to create that registration. The live beta attempt produced `AADSTS50020` in Microsoft's fixed `Microsoft Services` tenant. The CLI, extension, and integration guide therefore state the Entra tenant-role prerequisite before directing a user to the admin center and offer Azure-tenant, administrator, Gmail, and `.eml` alternatives.
+
+## D-016: Gmail credentials import from Google's downloaded web-client JSON
+
+Copying a Gmail client secret into a command argument leaks it into shell history, while an ordinary prompt may echo it. ContextFill instead accepts Google's downloaded OAuth web-client JSON with `--setup gmail --credentials`. It rejects symlinks, non-files, files over 64 KB, malformed or non-web clients, invalid credential shapes, and registrations missing the exact runtime callback. Only the ID and secret are written to the owner-only `.env`; the command prints neither and immediately runs the non-secret readiness doctor. The user deletes Google's source JSON after import.

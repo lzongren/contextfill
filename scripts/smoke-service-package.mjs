@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -148,13 +148,37 @@ try {
   if (!savedEnvironment.includes(`CONTEXTFILL_MICROSOFT_CLIENT_ID=${clientId}`)) {
     throw new Error('Installed companion guided setup did not persist the Outlook client ID.');
   }
+  const googleClientId = '123456789-contextfill.apps.googleusercontent.com';
+  const googleClientSecret = 'fake-google-client-secret';
+  const googleCredentials = resolve(runtime, 'google-client.json');
+  await writeFile(
+    googleCredentials,
+    JSON.stringify({
+      web: {
+        client_id: googleClientId,
+        client_secret: googleClientSecret,
+        redirect_uris: ['http://localhost:4318/mail/oauth/gmail/callback'],
+      },
+    }),
+    { mode: 0o600 },
+  );
+  const gmailSetup = await run(bin, ['--setup', 'gmail', '--credentials', googleCredentials], {
+    cwd: runtime,
+  });
+  if (
+    !gmailSetup.stdout.includes('Result: ready for gmail, outlook') ||
+    gmailSetup.stdout.includes(googleClientId) ||
+    gmailSetup.stdout.includes(googleClientSecret)
+  ) {
+    throw new Error('Installed companion guided setup did not safely configure Gmail.');
+  }
   const doctorReady = await run(bin, ['--doctor'], { cwd: runtime });
   if (!doctorReady.stdout.includes('Outlook: ready') || doctorReady.stdout.includes(clientId)) {
     throw new Error('Installed companion doctor did not safely report provider readiness.');
   }
   await smokeStart(bin, runtime);
   console.log(
-    'Installed companion package passed help/init/guided-setup/doctor/no-overwrite/startup/health smoke checks.',
+    'Installed companion package passed help/init/Gmail+Outlook-setup/doctor/no-overwrite/startup/health smoke checks.',
   );
 } finally {
   await rm(directory, { recursive: true, force: true });

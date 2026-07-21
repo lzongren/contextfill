@@ -33,7 +33,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 3. Install the companion package and create a private runtime configuration:
 
    ```bash
-   npm install --global ./contextfill-companion-v0.2.0-beta.5.tgz
+   npm install --global ./contextfill-companion-v0.2.0-beta.6.tgz
    mkdir contextfill-runtime
    cd contextfill-runtime
    contextfill-service --init
@@ -64,7 +64,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
    contextfill-service --setup outlook
    ```
 
-   From a source checkout, use `npm run service -- --setup outlook`. Gmail's web-client secret must still be entered directly in the private `.env` file.
+   From a source checkout, use `npm run service -- --setup outlook`. Gmail has an equivalent secret-safe downloaded-JSON flow described below.
 
 3. Validate the local configuration. The doctor prints exact callbacks and scopes, checks that the loopback ports agree and `.env` is owner-only, and never prints credential values:
 
@@ -107,12 +107,13 @@ Keychain failure does not break the connector, but both pairing and provider aut
    http://localhost:4318/mail/oauth/gmail/callback
    ```
 
-5. Set the generated credentials in `.env`:
+5. Download the OAuth web-client JSON. Import it directly so the secret is not copied into terminal history or printed:
 
-   ```dotenv
-   CONTEXTFILL_GOOGLE_CLIENT_ID=
-   CONTEXTFILL_GOOGLE_CLIENT_SECRET=
+   ```bash
+   contextfill-service --setup gmail --credentials /path/to/client_secret.json
    ```
+
+   From a source checkout, use `npm run service -- --setup gmail --credentials /path/to/client_secret.json`. The command rejects desktop clients, malformed/oversized files, and clients without the exact runtime callback; it updates only the Gmail keys in owner-only `.env` and never prints either credential. Delete the downloaded JSON after a successful import.
 
 Google classifies `gmail.readonly` as a restricted scope. Personal testing can use an OAuth test user, but a generally distributed application must complete Google's OAuth verification requirements. If restricted Gmail data is stored or transmitted through a remote server, Google also requires a security assessment. ContextFill's current connector keeps tokens and message processing on the user's loopback service, but public distribution still needs a formal Google review.
 
@@ -120,7 +121,11 @@ Official references: [Gmail scopes](https://developers.google.com/workspace/gmai
 
 ## Outlook and Microsoft 365
 
-1. Create an app registration in Microsoft Entra.
+Creating an app registration and signing into the finished application are different account checks. Registration requires a work/school identity in an Entra tenant with permission to register apps (at least the Application Developer role), or a personal Microsoft account backed by an Azure account and its own tenant. A standalone Outlook.com/Hotmail personal account is placed in the restricted `Microsoft Services` tenant and cannot create registrations; it can still use a finished app whose supported account type includes personal Microsoft accounts. If the admin center reports `AADSTS50020` in the `Microsoft Services` tenant, create an Azure account/tenant, ask a tenant administrator to register ContextFill, or configure Gmail instead.
+
+Official prerequisite and error guidance: [register an application](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app) and [AADSTS50020 troubleshooting](https://learn.microsoft.com/en-us/troubleshoot/entra/entra-id/app-integration/error-code-aadsts50020-user-account-identity-provider-does-not-exist).
+
+1. Create an app registration in Microsoft Entra while signed into the tenant that will own it.
 2. Choose the supported account type appropriate for your use. `common` supports personal Microsoft accounts plus work and school accounts when the registration allows them.
 3. Add a Mobile and desktop application platform with this loopback redirect URI:
 
