@@ -9,6 +9,7 @@ import {
   type MailboxMessage,
 } from '../../../packages/core/src/index.js';
 import { EmlImportError, parseEmlImport } from './eml-import.js';
+import type { AutomationMode, AutomationSiteRule } from './automation-settings.js';
 import { enhanceCandidatesWithModel } from './model-client.js';
 import {
   beginMailConnection,
@@ -53,6 +54,7 @@ let mailSource: MailSource = 'synthetic';
 let persistedMailSource: PersistentMailSource = 'synthetic';
 let importedMessages: MailboxMessage[] = [];
 let realMailModelOptIn = false;
+let viewGeneration = 0;
 
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -76,10 +78,19 @@ function shell(): { body: HTMLElement; footer: HTMLElement } {
   source.type = 'button';
   source.setAttribute('aria-label', `Message source: ${sourceLabel(mailSource)}. Change source.`);
   source.addEventListener('click', () => void renderMailSources());
-  header.append(brand, source);
+  const automation = element('button', 'source-button automation-button', 'Automation');
+  automation.type = 'button';
+  automation.setAttribute('aria-label', 'Configure Auto-Continue for this site.');
+  automation.addEventListener('click', () => void renderAutomationSettings());
+  const headerActions = element('div', 'header-actions');
+  headerActions.append(source, automation);
+  header.append(brand, headerActions);
   const body = element('section', 'app-body');
   const footer = element('footer', 'app-footer');
-  footer.append(element('span', '', 'Explicit action only'), element('span', '', 'Never submits'));
+  footer.append(
+    element('span', '', 'Visible, cancellable actions'),
+    element('span', '', 'Never submits'),
+  );
   app.append(header, body, footer);
   return { body, footer };
 }
@@ -209,6 +220,13 @@ async function backgroundMessage(request: BackgroundRequest): Promise<Background
   return (await chrome.runtime.sendMessage(request)) as BackgroundResponse;
 }
 
+function requireBackgroundSuccess(
+  response: BackgroundResponse,
+): Extract<BackgroundResponse, { ok: true }> {
+  if (!response.ok) throw new Error(response.error);
+  return response;
+}
+
 async function activeTab(): Promise<chrome.tabs.Tab> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error('No active browser tab is available.');
@@ -217,6 +235,145 @@ async function activeTab(): Promise<chrome.tabs.Tab> {
 
 async function contentMessage(tabId: number, request: ContentRequest): Promise<ContentResponse> {
   return (await chrome.tabs.sendMessage(tabId, request)) as ContentResponse;
+}
+
+function modeCopy(mode: AutomationMode): { title: string; status: string; copy: string } {
+  if (mode === 'assisted') {
+    return {
+      title: 'Assisted',
+      status: 'Confirm in page',
+      copy: 'ContextFill detects and verifies the message automatically, then waits for an in-page confirmation.',
+    };
+  }
+  if (mode === 'auto') {
+    return {
+      title: 'Auto-Continue',
+      status: '3-second countdown',
+      copy: 'A high-confidence verified code fills or verified link opens in this tab after a visible, cancellable countdown.',
+    };
+  }
+  return {
+    title: 'Manual',
+    status: 'Default',
+    copy: 'Nothing runs in the page until you open this popup and approve the action.',
+  };
+}
+
+function ruleForActiveSite(
+  rules: AutomationSiteRule[],
+  originPattern: string,
+): AutomationSiteRule | null {
+  return rules.find((rule) => rule.originPattern === originPattern) ?? null;
+}
+
+async function setActiveSiteMode(tab: chrome.tabs.Tab, mode: AutomationMode): Promise<void> {
+  const site = siteAccessRequest(tab.url);
+  if (!tab.id || !tab.url || !site) throw new Error('Open a normal HTTP or HTTPS page first.');
+  if (mode !== 'manual') {
+    const alreadyGranted = await chrome.permissions.contains({ origins: [site.originPattern] });
+    const granted =
+      alreadyGranted || (await chrome.permissions.request({ origins: [site.originPattern] }));
+    if (!granted) throw new Error(`Exact-site access was not granted for ${site.hostname}.`);
+  }
+  requireBackgroundSuccess(
+    await backgroundMessage({ type: 'SET_SITE_MODE', tabId: tab.id, tabUrl: tab.url, mode }),
+  );
+}
+
+async function renderAutomationSettings(tabOverride?: chrome.tabs.Tab): Promise<void> {
+  viewGeneration += 1;
+  if (clearTimer) clearTimeout(clearTimer);
+  clearTimer = null;
+  selected = null;
+  const { body } = shell();
+  try {
+    const tab = tabOverride ?? (await activeTab());
+    const site = siteAccessRequest(tab.url);
+    if (!site) {
+      body.append(
+        element('p', 'kicker', 'Automation'),
+        element('h1', '', 'Open a normal webpage'),
+        element('p', 'muted', 'Per-site automation cannot run on browser or extension pages.'),
+      );
+      return;
+    }
+    const overview = requireBackgroundSuccess(
+      await backgroundMessage({ type: 'GET_AUTOMATION_OVERVIEW' }),
+    );
+    const activeRule = ruleForActiveSite(overview.rules ?? [], site.originPattern);
+    const activeMode: AutomationMode = activeRule?.mode ?? 'manual';
+    body.append(
+      element('p', 'kicker', 'Verified Auto-Continue'),
+      element('h1', '', `Choose how ContextFill works on ${site.hostname}`),
+      element(
+        'p',
+        'muted',
+        'New sites stay Manual. Assisted and Auto-Continue require exact-site access and can be revoked at any time.',
+      ),
+    );
+
+    for (const mode of ['manual', 'assisted', 'auto'] as const) {
+      const details = modeCopy(mode);
+      const card = sourceCard(
+        details.title,
+        activeMode === mode ? 'Enabled' : details.status,
+        details.copy,
+      );
+      const choose = sourceAction(
+        activeMode === mode
+          ? `${details.title} is enabled`
+          : mode === 'manual'
+            ? 'Use Manual mode'
+            : `Enable ${details.title}`,
+        activeMode !== mode,
+      );
+      choose.disabled = activeMode === mode;
+      if (mode === 'auto' && activeMode !== 'auto') {
+        const consent = element('label', 'automation-consent');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        consent.append(
+          checkbox,
+          document.createTextNode(
+            ' I understand that verified links may navigate this tab and some sites submit automatically after the last OTP digit.',
+          ),
+        );
+        choose.disabled = true;
+        checkbox.addEventListener('change', () => {
+          choose.disabled = !checkbox.checked;
+        });
+        card.card.insertBefore(consent, card.actions);
+      }
+      choose.addEventListener('click', () => {
+        void (async () => {
+          try {
+            await setActiveSiteMode(tab, mode);
+            await renderAutomationSettings(tab);
+          } catch (error) {
+            renderMessage(
+              'error',
+              'Could not change automation mode',
+              error instanceof Error ? error.message : 'Try again on the requesting page.',
+            );
+          }
+        })();
+      });
+      card.actions.append(choose);
+      body.append(card.card);
+    }
+
+    const manage = sourceAction('Manage trusted sites and activity');
+    manage.addEventListener('click', () => void chrome.runtime.openOptionsPage());
+    const back = sourceAction('Back to scan');
+    back.addEventListener('click', () => void scan());
+    body.append(manage, back);
+  } catch (error) {
+    body.append(
+      element('p', 'kicker', 'Automation'),
+      element('h1', '', 'Settings are unavailable'),
+      element('p', 'muted', error instanceof Error ? error.message : 'Try reopening the popup.'),
+    );
+  }
 }
 
 function renderConfirmation(ranked: RankedCandidate, page: PageContext): void {
@@ -562,6 +719,7 @@ async function connectProvider(provider: MailProvider): Promise<void> {
 }
 
 async function renderMailSources(): Promise<void> {
+  viewGeneration += 1;
   if (clearTimer) clearTimeout(clearTimer);
   clearTimer = null;
   selected = null;
@@ -572,7 +730,7 @@ async function renderMailSources(): Promise<void> {
     element(
       'p',
       'muted',
-      'Import one exported message entirely in this popup, or connect read-only mailbox access through the loopback companion. Every transfer or navigation still requires explicit approval.',
+      'Import one exported message entirely in this popup, or connect read-only mailbox access through the loopback companion. Deterministic policy always decides; per-site settings control whether execution is manual, assisted, or automatic.',
     ),
   );
 
@@ -698,6 +856,7 @@ async function fillSelected(warningOverride: boolean): Promise<void> {
 }
 
 async function scan(): Promise<void> {
+  const generation = ++viewGeneration;
   renderLoading();
   let tab: chrome.tabs.Tab | null = null;
   try {
@@ -721,6 +880,7 @@ async function scan(): Promise<void> {
     const usedResponse = await backgroundMessage({ type: 'GET_USED_CANDIDATES' });
     const usedCandidateIds = new Set(usedResponse.ok ? usedResponse.candidateIds : []);
     const ranked = rankCandidates(enhanced.candidates, page, { usedCandidateIds });
+    if (generation !== viewGeneration) return;
     const first = ranked[0];
     if (!first) {
       renderMessage(
@@ -742,6 +902,7 @@ async function scan(): Promise<void> {
     };
     renderConfirmation(displayCandidate, page);
   } catch (error) {
+    if (generation !== viewGeneration) return;
     if (!(error instanceof MailClientError) && tab && isMissingHostPermission(error)) {
       renderSiteAccessRequest(tab);
       return;

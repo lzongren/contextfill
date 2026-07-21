@@ -13,6 +13,7 @@ const entries = [
   ['src/popup.ts', 'popup.js'],
   ['src/content.ts', 'content.js'],
   ['src/background.ts', 'background.js'],
+  ['src/options.ts', 'options.js'],
 ];
 
 for (const [entry, outfile] of entries) {
@@ -31,6 +32,8 @@ for (const [entry, outfile] of entries) {
 
 await cp(resolve(extensionRoot, 'popup.html'), resolve(outdir, 'popup.html'));
 await cp(resolve(extensionRoot, 'popup.css'), resolve(outdir, 'popup.css'));
+await cp(resolve(extensionRoot, 'options.html'), resolve(outdir, 'options.html'));
+await cp(resolve(extensionRoot, 'options.css'), resolve(outdir, 'options.css'));
 
 const manifest = JSON.parse(await readFile(resolve(extensionRoot, 'manifest.json'), 'utf8'));
 await writeFile(resolve(outdir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);

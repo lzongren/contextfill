@@ -43,5 +43,12 @@
 - [x] Completed a user-observed real Gmail-to-Medium magic-link handoff: local no-fetch inspection, masked URL, aligned sender/page/destination decision, explicit click, and successful same-tab sign-in.
 - [x] Hardened real-provider compatibility after the live run: mixed code/link messages prefer verified handoff, long URLs are removed from bounded supporting evidence, and fallback codes embedded in subjects are masked.
 - [x] Published `v0.2.0-beta.7` as a public GitHub prerelease after the complete Linux release gate; downloaded all four public assets and verified both checksums and archive structures.
+- [x] Implemented Verified Auto-Continue with per-origin Manual, Assisted, and Auto modes; Auto requires separate acknowledgement and a visible cancellable three-second in-page countdown.
+- [x] Added popup-free OTP fill and same-tab verified magic-link navigation with execution-time URL, hostname, visible-intent, permission, mode, freshness, replay, and deterministic-policy revalidation.
+- [x] Added dynamic SPA wait-state detection, hidden/disabled decoy rejection, competing-message fail-closed selection, page-removed countdown cancellation, reduced-motion support, and exact-origin revocation.
+- [x] Added privacy-preserving local activity history with a strict secret-free schema, 24-record cap, seven-day TTL, clear control, and trusted-site management page.
+- [x] Passed the pre-release Auto-Continue gate: formatting/lint/types, 104 unit/integration tests, three production builds, seven packaged-extension scenarios, and seven judge-browser regressions.
+- [ ] Complete fresh real Gmail acceptance in Auto mode on one OTP site and Medium magic-link login; record outcome without exposing a code or token.
+- [ ] Package, publish, and independently download/verify the `v0.2.0-beta.8` public prerelease after the final real-flow acceptance.
 - [ ] Complete a live Outlook connection when an Entra app registration is available; this is not required for the Gmail-backed release.
 - [ ] Human-only submission work: clean-profile walkthrough, record/upload the public video, edit the remaining Devpost placeholders, and run `/feedback`.

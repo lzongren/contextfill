@@ -1,6 +1,6 @@
 # Real mailbox integration
 
-ContextFill has two real-message paths. A one-time `.eml` import needs no account connection and stays entirely in the extension popup. Ongoing Gmail or Outlook access uses the local companion service: OAuth tokens and provider API calls stay in the Node.js process on `127.0.0.1`, while the extension receives only a normalized, bounded set of recent message evidence. Neither the provider nor the MIME parser decides whether a link may open or a value may fill.
+ContextFill has two real-message paths. A one-time `.eml` import needs no account connection and stays entirely in the extension popup; because file selection is an explicit browser gesture, this path is Manual only. Ongoing Gmail or Outlook access uses the local companion service and supports Manual, Assisted, and Auto-Continue: OAuth tokens and provider API calls stay in the Node.js process on `127.0.0.1`, while the extension receives only a normalized, bounded set of recent message evidence. Neither the provider nor the MIME parser decides whether a link may open or a value may fill.
 
 ## Try one real message without OAuth
 
@@ -17,13 +17,13 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 - OAuth uses authorization code flow, PKCE, a random 10-minute state value, and an exact loopback callback.
 - Mail and model-extraction endpoints require a 256-bit per-install capability established with a one-time six-digit terminal code. The service binds it to the extension installation ID and cross-checks the browser `Origin` header whenever Chrome supplies one.
 - Refresh tokens and the hashed service capability are stored in the native macOS Keychain, Windows Credential Manager, or Linux Secret Service through `@napi-rs/keyring`. Access tokens stay in service memory. If the keyring is unavailable, the UI explicitly reports session-only storage.
-- The extension stores only its random pairing capability, selected source, and explicit model opt-in. Chrome storage is restricted to trusted extension contexts; message bodies, link tokens, codes, references, provider tokens, and account authorization never enter it.
+- The extension stores its random pairing capability, selected source, explicit model opt-in, exact-origin automation rules, session-only replay IDs, and privacy-minimized activity outcomes. The activity schema excludes codes, URLs/tokens, subjects, senders, bodies, and page paths; it keeps at most 24 records for seven days. Chrome storage is restricted to trusted extension contexts; message bodies, candidate values, provider tokens, and account authorization never enter it.
 - Real mailbox messages use deterministic local extraction by default. Sending a prefiltered real message through the optional GPT-5.6 extractor requires a separate explicit toggle in the source screen.
 - Imported `.eml` files are capped at 2 MB and parsed with explicit MIME nesting and header-size limits. HTML is converted to inert text plus HTTP(S) link evidence; scripts, styles, templates, and attachments do not enter extraction.
 - Gmail queries only temporary-action phrases from the last day and fetches at most 12 bodies. It intentionally uses Gmail's normal result set without opting into Spam or Trash; move a legitimate message to the inbox before scanning. Outlook reads 25 recent summaries, filters locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
 - HTML-only message normalization preserves HTTPS anchor destinations as inert text. It does not load images, execute HTML, fetch destinations, or follow redirects.
 - Disconnect clears memory, deletes the keychain refresh credential, and makes a best-effort Google revocation request.
-- ContextFill still shows an allow/warn/block decision and requires explicit user approval. It never submits the form.
+- ContextFill still requires deterministic `allow` before any Assisted or automatic action. Auto-Continue requires explicit per-origin opt-in and shows a cancellable three-second in-page countdown; it revalidates the page and policy immediately before acting. The extension never clicks or invokes form submission, although a destination page may submit from its own input handler after the final OTP digit.
 
 ## Common setup
 
@@ -34,7 +34,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 3. Install the companion package and create a private runtime configuration:
 
    ```bash
-   npm install --global ./contextfill-companion-v0.2.0-beta.7.tgz
+   npm install --global ./contextfill-companion-v0.2.0-beta.8.tgz
    mkdir contextfill-runtime
    cd contextfill-runtime
    contextfill-service --init
@@ -86,6 +86,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 5. Copy the six-digit pairing code printed in the terminal. Open ContextFill, click the message-source button, enter the code, and click **Pair service**. The code is single-use and expires after 10 minutes.
 6. Connect Gmail or Outlook and finish the provider consent flow in the new tab.
 7. Reopen ContextFill on the real page that initiated or requests the temporary action and select the connected mailbox as the source. A service restart restores the refresh authorization from the OS keychain.
+8. Optional: open **Automation** for that page and choose **Assisted** or **Auto-Continue**. Approve only the exact origin shown. Every new origin starts Manual, Auto requires an additional acknowledgement, and **Manage trusted sites and activity** can revoke the rule and permission at any time.
 
 Leave **GPT-5.6 for real mail** disabled if message bodies must remain on the device. Enabling it allows one prefiltered message at a time to pass from the loopback service to the configured OpenAI API with `store: false`; deterministic code still makes every allow/warn/block decision.
 

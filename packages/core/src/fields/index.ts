@@ -4,6 +4,11 @@ export type FieldTarget = {
   score: number;
 };
 
+export type AutomaticPageSignal = {
+  intents: Array<'otp' | 'magic_link'>;
+  reason: string;
+};
+
 const codeWords =
   /\b(verification|verify|one[- ]?time|otp|security|auth(?:entication)?|sign[- ]?in|login|access\s+code|confirmation\s+code|passcode)\b/i;
 const strongCodeWords =
@@ -155,6 +160,41 @@ export function findReferenceField(document: Document): FieldTarget | null {
 
 export function findContextField(document: Document): FieldTarget | null {
   return findVerificationFields(document) ?? findReferenceField(document);
+}
+
+function visiblePageText(document: Document): string {
+  const body = document.body;
+  if (!body) return '';
+  // innerText excludes most hidden content in a real browser. textContent keeps the helper
+  // deterministic under JSDOM, where layout and innerText are not fully implemented.
+  return ((body as HTMLElement).innerText || body.textContent || '').slice(0, 20_000);
+}
+
+export function detectAutomaticPageSignal(
+  document: Document,
+  target: FieldTarget | null = findContextField(document),
+): AutomaticPageSignal {
+  const intents: Array<'otp' | 'magic_link'> = [];
+  if (target?.kind === 'single' || target?.kind === 'split') intents.push('otp');
+
+  const text = visiblePageText(document);
+  const mentionsEmailHandoff =
+    /\b(check|open)\s+(?:your\s+)?email(?:\s+inbox)?\b|\b(?:sent|send|sending)\b[^.\n]{0,100}\bemail\b|\bemail\b[^.\n]{0,100}\b(?:sent|inbox)\b/i.test(
+      text,
+    );
+  const mentionsLinkAction =
+    /\bmagic\s+link\b|\b(?:sign[- ]?in|log ?in|verification|confirmation|secure access)\s+link\b|\bclick\b[^.\n]{0,80}\b(?:link|email)\b|\bverify\s+(?:your\s+)?email\b/i.test(
+      text,
+    );
+  if (mentionsEmailHandoff && mentionsLinkAction) intents.push('magic_link');
+
+  return {
+    intents: [...new Set(intents)],
+    reason:
+      intents.length > 0
+        ? 'The page visibly requests an email verification action.'
+        : 'No supported email-verification wait state was detected.',
+  };
 }
 
 function setInputValue(input: HTMLInputElement, value: string): void {

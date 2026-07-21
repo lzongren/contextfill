@@ -61,7 +61,7 @@ test('the packaged MV3 extension loads and boots its popup bundle', async () => 
     const popup = await context.newPage();
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
     await expect(popup.getByText('ContextFill', { exact: true })).toBeVisible();
-    await expect(popup.getByText('Explicit action only')).toBeVisible();
+    await expect(popup.getByText('Visible, cancellable actions')).toBeVisible();
     await expect(popup.getByRole('heading')).toContainText(
       /ContextFill cannot inspect|Looking for a trusted match/,
     );

@@ -14,8 +14,10 @@ export type VerifiedNavigationRequest = {
   source: NavigationSource;
   tabId: number;
   scannedTabUrl: string;
-  userApproved: true;
-};
+} & (
+  | { userApproved: true; autoContinue?: never }
+  | { userApproved?: never; autoContinue: { pageHostname: string } }
+);
 
 export type VerifiedNavigationDependencies = {
   getTab: (tabId: number) => Promise<{ id?: number | undefined; url?: string | undefined }>;
@@ -72,8 +74,10 @@ export async function performVerifiedNavigation(
   request: VerifiedNavigationRequest,
   dependencies: VerifiedNavigationDependencies,
 ): Promise<VerifiedNavigationResult> {
-  if (request.userApproved !== true || request.policy.decision !== 'allow') {
-    throw new Error('Explicit approval and an allowed trust decision are required.');
+  const authorized =
+    request.userApproved === true || request.autoContinue?.pageHostname === request.page.hostname;
+  if (!authorized || request.policy.decision !== 'allow') {
+    throw new Error('User authorization and an allowed trust decision are required.');
   }
 
   const currentTab = await dependencies.getTab(request.tabId);
