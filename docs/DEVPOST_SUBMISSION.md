@@ -90,7 +90,7 @@ Application code validates every copied value and excerpt against the source, re
 - Dynamic SPA detection and a privacy-minimized seven-day activity view.
 - Local-only URL inspection, permanent token masking, exact same-tab navigation, and independent lookalike proof.
 - No-key offline operation, strict GPT-5.6 extraction boundaries, and comprehensive automated/browser coverage.
-- A completed real Gmail-to-Medium Manual handoff plus a beta.8 real-provider acceptance gate before Auto-Continue release.
+- A completed real Gmail-to-Medium Manual handoff plus popup-free Medium magic-link and six-field Substack OTP Auto acceptance before the beta.8 release.
 
 ## What was learned
 

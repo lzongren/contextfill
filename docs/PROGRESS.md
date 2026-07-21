@@ -10,9 +10,9 @@
 - [x] Added masked Shadow DOM presentation with keyboard/Escape support, reduced-motion behavior, and no raw booking reference or surname in the overlay DOM.
 - [x] Added aligned, lookalike, decoy, conflict, stale, nonempty, and reduced-motion judge scenarios plus packaged-extension activation limited to exact judge/test origins and allowlisted metadata.
 - [x] Added focused schema, extraction, policy, mapping, rollback, masking, activation, service, packaged-extension, and installed-Chrome regressions.
-- [x] Passed the final full release gate (104 unit/integration, 3 packaged-extension, and 12 installed-Chrome tests), companion clean-install smoke, archive integrity and secret-name scans, and a zero-vulnerability production audit.
-- [x] Integrated the isolated Capsule commit onto `codex/wow-experiment`, repeated the complete release/package/audit gates, and independently walked the 1280×720 success, Undo, Escape, and lookalike experiences.
-- [ ] Push the final integration commit and open the focused draft review without merging or publishing a release; rebase onto the concurrent beta.8 mainline after it lands.
+- [x] Passed the final post-rebase release gate (119 unit/integration, 9 packaged-extension, and 12 installed-Chrome tests), companion clean-install smoke, archive integrity and secret-name scans, and a zero-vulnerability production audit.
+- [x] Rebased the Capsule integration onto latest beta.8 `main` commit `e98473f4`, repeated the complete release/package/audit gates, and retained the independently reviewed 1280×720 success, Undo, Escape, and lookalike experiences.
+- [x] Opened focused draft PR #17 without merging or publishing a competing release and completed its beta.8 rebase locally for the final review push.
 
 ## 2026-07-20
 
