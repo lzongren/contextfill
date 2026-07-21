@@ -101,3 +101,9 @@ A two-fact handoff is useful only if its receipt is truthful. Execution therefor
 ## D-025: Synthetic capsule activation uses a closed allowlist
 
 The manifest must inject the capsule entry on loopback so the packaged judge flow is automatic, but loopback metadata is untrusted. The entry therefore mounts only for the root path on exact origins `http://127.0.0.1:4173` and `http://127.0.0.1:4179` plus a closed scenario-to-host-and-service mapping. Prefix matching, arbitrary ports, localhost aliases, other paths, and caller-provided host/service combinations are rejected. Port `4173` is the human judge lab; `4179` is dedicated to automated acceptance tests so concurrent development servers cannot be mistaken for the product fixture.
+
+## D-026: Real easyJet lookup is explicit, exact-origin, and user-selected
+
+Ordinary Gmail ingestion remains a one-day temporary-action query. A user who opens ContextFill on the exact HTTPS easyJet booking-dialog route may request a separate five-year subject-bounded lookup because historical bookings are legitimate inputs to easyJet's Find Booking form. The service excludes Spam and Trash, caps body retrieval, requires easyJet subject/body/domain evidence, and stamps the service hint only after direct or verified Apple Hide My Email sender evidence passes. Multiple confirmations become masked user choices rather than a policy conflict or automatic selection. The resulting capsule still expires after 90 seconds and is reauthorized and remapped at action time.
+
+Production keeps `easyjet.com` as an optional exact-origin runtime grant. A test-only build flag may add that host to an ephemeral conformance artifact because command-line-opened extension popups do not receive `activeTab`; the normal build and shipped manifest never consume that flag.

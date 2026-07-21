@@ -20,7 +20,7 @@ The file must end in `.eml` and be no larger than 2 MB. Parsing happens inside t
 - The extension stores only its random pairing capability, selected source, and explicit model opt-in. Chrome storage is restricted to trusted extension contexts; message bodies, link tokens, codes, references, provider tokens, and account authorization never enter it.
 - Real mailbox messages use deterministic local extraction by default. Sending a prefiltered real message through the optional GPT-5.6 extractor requires a separate explicit toggle in the source screen.
 - Imported `.eml` files are capped at 2 MB and parsed with explicit MIME nesting and header-size limits. HTML is converted to inert text plus HTTP(S) link evidence; scripts, styles, templates, and attachments do not enter extraction.
-- Gmail queries only temporary-action phrases from the last day and fetches at most 12 bodies. It intentionally uses Gmail's normal result set without opting into Spam or Trash; move a legitimate message to the inbox before scanning. Outlook reads 25 recent summaries, filters locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
+- Gmail normally queries only temporary-action phrases from the last day and fetches at most 12 bodies. The explicit easyJet booking-lookup route is a separate exception: only on the exact official booking-dialog page, it requests subjects matching `easyJet booking reference` from the last five years, excludes Spam and Trash, strictly verifies sender/domain evidence, returns at most 12 confirmations, and requires the user to choose a masked booking. Outlook reads 25 recent summaries, filters locally, then retrieves at most 12 code/link/reference-like bodies before returning at most 10 messages.
 - HTML-only message normalization preserves HTTPS anchor destinations as inert text. It does not load images, execute HTML, fetch destinations, or follow redirects.
 - Disconnect clears memory, deletes the keychain refresh credential, and makes a best-effort Google revocation request.
 - ContextFill still shows an allow/warn/block decision and requires explicit user approval. It never submits the form.
@@ -98,6 +98,17 @@ If the browser capability is lost or you intentionally want to pair another inst
 Keychain failure does not break the connector, but both pairing and provider authorization become session-only and must be repeated after the service stops. The source screen makes that downgrade visible.
 
 ## Gmail
+
+### Private easyJet booking lookup
+
+1. Open `https://www.easyjet.com/en?accntmdl=2` and select **Find Booking** so the visible surname and booking-reference fields are present.
+2. Open ContextFill, grant access only to `https://www.easyjet.com/*` if Chrome requests it, and select the connected Gmail source.
+3. Choose one masked confirmation. ContextFill refuses to choose automatically when several bookings exist.
+4. Review the in-page deterministic trust trace and field map, then choose **Transfer 2 verified facts**.
+5. Confirm the receipt says the form was not submitted. Do not press easyJet's **Find Booking** action during conformance testing.
+6. Choose **Undo** and confirm both fields return to their original values. Undo intentionally does not make the capsule reusable.
+
+Apple Hide My Email forwarding is supported only when the envelope sender is an `icloud.com` relay whose local part encodes the same domain as the apparent original easyJet address. A display name alone is never sender evidence. Raw relay addresses, booking references, surnames, and message bodies are not logged or persisted.
 
 1. Create or choose a Google Cloud project and enable the Gmail API.
 2. Configure the OAuth consent screen. During development, keep the app in testing mode and add your own Google account as a test user.

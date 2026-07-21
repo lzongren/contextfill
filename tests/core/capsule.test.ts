@@ -20,6 +20,27 @@ const page: CapsulePageContext = {
   simulated: true,
   scenario: 'capsule',
 };
+const easyJetMessage = {
+  id: 'gmail:easyjet-synthetic',
+  source: 'gmail' as const,
+  senderName: 'confirmation@easyjet.com',
+  senderAddress: 'private_alias_at_easyjet_com_random@icloud.com',
+  senderRelay: {
+    kind: 'apple_hide_my_email' as const,
+    originalAddress: 'confirmation@easyjet.com',
+  },
+  subject: 'easyJet booking reference: EZ7TEST',
+  body: 'Hi, Sample; here are details for your booking EZ7TEST. Manage it at https://www.easyjet.com/en.',
+  receivedAt: '2024-08-10T12:00:00.000Z',
+  expiresAt: null,
+  serviceHint: 'easyJet',
+};
+const easyJetPage: CapsulePageContext = {
+  hostname: 'www.easyjet.com',
+  serviceHint: 'easyJet',
+  simulated: false,
+  scenario: null,
+};
 
 describe('context capsule schema and extraction', () => {
   it('extracts only the two typed travel facts with a short expiry', () => {
@@ -97,6 +118,14 @@ describe('context capsule schema and extraction', () => {
     expect(hasConflictingTravelCapsules(capsules)).toBe(true);
     expect(hasConflictingTravelCapsules([capsules[0]!])).toBe(false);
   });
+
+  it('extracts an easyJet surname from the bounded confirmation greeting', () => {
+    const capsule = extractContextCapsuleDeterministic(easyJetMessage, now)!;
+    expect(capsule.facts).toEqual([
+      expect.objectContaining({ key: 'booking_reference', value: 'EZ7TEST' }),
+      expect.objectContaining({ key: 'passenger_surname', value: 'Sample' }),
+    ]);
+  });
 });
 
 describe('context capsule trust authorization', () => {
@@ -136,5 +165,26 @@ describe('context capsule trust authorization', () => {
         usedCapsuleIds: new Set([capsule.id]),
       }).reasonCode,
     ).toBe('used');
+  });
+
+  it('accepts only an Apple relay address that encodes the easyJet sender domain', () => {
+    const capsule = extractContextCapsuleDeterministic(easyJetMessage, now)!;
+    expect(
+      authorizeContextCapsule(capsule, easyJetMessage, easyJetPage, {
+        now,
+        maxMessageAgeMinutes: 5 * 365 * 24 * 60,
+      }),
+    ).toMatchObject({ decision: 'allow', reasonCode: 'aligned', matchedDomain: 'www.easyjet.com' });
+    expect(
+      authorizeContextCapsule(
+        capsule,
+        {
+          ...easyJetMessage,
+          senderAddress: 'private_alias_at_attacker_com_random@icloud.com',
+        },
+        easyJetPage,
+        { now, maxMessageAgeMinutes: 5 * 365 * 24 * 60 },
+      ).reasonCode,
+    ).toBe('sender_conflict');
   });
 });

@@ -8,11 +8,14 @@ import {
   type MailboxMessage,
 } from '../types.js';
 
-const travelLanguage = /\b(check[- ]?in|flight|airline|boarding|booking confirmation|itinerary)\b/i;
+const travelLanguage =
+  /\b(check[- ]?in|flight|airline|boarding|booking confirmation|booking reference|itinerary|easyJet)\b/i;
 const bookingReferencePattern =
   /\b(?:booking|reservation)\s+(?:reference|confirmation|number|code)\s*(?:is\s+|:\s*|#\s*)([A-Z0-9][A-Z0-9-]{3,19})\b/i;
 const passengerSurnamePattern =
   /\b(?:passenger\s+(?:surname|last name)|surname|family name|last name)\s*(?:is\s+|:\s*)?([\p{L}][\p{L}\p{M}'’ -]{0,78}[\p{L}\p{M}])(?=\s*(?:[.\n,;]|$))/iu;
+const easyJetGreetingSurnamePattern =
+  /\bHi,\s*([\p{L}][\p{L}\p{M}'’ -]{0,78}[\p{L}\p{M}])\s*[;,](?=\s*(?:here|thank|your|we|you)\b)/iu;
 const domainPattern = /\b(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,63})(?:[/:?#]|\b)/gi;
 
 export const modelContextCapsuleFactsSchema = z
@@ -80,7 +83,9 @@ export function extractContextCapsuleDeterministic(
   const text = `${message.subject}\n${message.body}`;
   if (!travelLanguage.test(text)) return null;
   const bookingReference = text.match(bookingReferencePattern)?.[1]?.toUpperCase();
-  const passengerSurname = text.match(passengerSurnamePattern)?.[1];
+  const passengerSurname =
+    text.match(passengerSurnamePattern)?.[1] ??
+    (/\beasyJet\b/i.test(text) ? text.match(easyJetGreetingSurnamePattern)?.[1] : undefined);
   if (!bookingReference || !passengerSurname) return null;
   return contextCapsuleSchema.parse({
     id: `capsule:${message.id}`,

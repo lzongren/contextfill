@@ -43,6 +43,14 @@ export const mailboxMessageSchema = z
     source: z.enum(['synthetic', 'gmail', 'outlook', 'import']).optional(),
     senderName: z.string().max(320).nullable(),
     senderAddress: z.string().email().max(320).nullable(),
+    senderRelay: z
+      .object({
+        kind: z.literal('apple_hide_my_email'),
+        originalAddress: z.string().email().max(320),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     subject: z.string().min(1).max(500),
     body: z.string().min(1).max(10_000),
     receivedAt: z.string().datetime(),

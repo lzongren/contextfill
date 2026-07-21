@@ -9,6 +9,7 @@ import { extractCapsuleWithGpt, extractWithGpt } from './extractor.js';
 import {
   createMailboxManager,
   MailboxError,
+  mailboxPurposeSchema,
   mailProviderSchema,
   type MailboxManagerLike,
 } from './mailbox.js';
@@ -189,8 +190,12 @@ export function createServiceApp(
     }
     const provider = mailProviderSchema.safeParse(context.req.param('provider'));
     if (!provider.success) return context.json({ error: 'unsupported_provider' }, 404);
+    const purpose = mailboxPurposeSchema.safeParse(
+      context.req.query('purpose') ?? 'temporary_action',
+    );
+    if (!purpose.success) return context.json({ error: 'unsupported_mailbox_purpose' }, 400);
     try {
-      return context.json({ messages: await mailbox.listMessages(provider.data) });
+      return context.json({ messages: await mailbox.listMessages(provider.data, purpose.data) });
     } catch (error) {
       const failure = mailboxError(error);
       return context.json(

@@ -2,6 +2,11 @@
 
 ## 2026-07-21
 
+- [x] Added the isolated private Gmail → easyJet path: purpose-bounded historical confirmation retrieval, deterministic `Hi, Surname;` extraction, strict Apple Hide My Email relay evidence, and masked user choice across multiple bookings.
+- [x] Added exact-route `https://www.easyjet.com/en?accntmdl=2` activation with runtime-only production permission, action-time policy/DOM revalidation, atomic transfer, replay-before-Undo, and no submit.
+- [x] Inspected the live easyJet Find Booking DOM: visible surname, booking-reference, and consent-checkbox controls share one form; the mapper selects only the two text inputs.
+- [x] Completed a private packaged conformance run using real matching Gmail confirmations and the current easyJet DOM contract. It transferred both facts, left consent false, recorded zero submits, displayed the truthful receipt, restored both fields with Undo, and logged no raw values.
+
 - [x] Implemented Verified Context Capsules as the airline-check-in hero flow: exactly one booking reference and passenger surname, a compact Message → trust checks → capsule → destination trace, explicit two-field transfer, truthful no-submit receipt, and Undo.
 - [x] Added strict Zod schemas and deterministic/model extraction boundaries; GPT-5.6 can return source-grounded facts only and cannot authorize or choose fields.
 - [x] Added deterministic sender/service/origin/freshness/expiry/replay policy with controlled lookalike blocking and action-time revalidation.

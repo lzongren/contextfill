@@ -45,6 +45,12 @@ Then:
 
 No email account, cloud setup, personal data, paid service, or OpenAI API key is required. See [Judge testing](docs/JUDGE_TESTING.md) for every fixture and expected result.
 
+### Private Gmail → easyJet conformance
+
+When **Gmail** is the selected source and the user explicitly opens ContextFill on `https://www.easyjet.com/en?accntmdl=2`, ContextFill performs a separate, purpose-bounded lookup for easyJet booking confirmations from the last five years. It accepts only messages whose subject, body domain evidence, direct sender or strictly encoded Apple Hide My Email relay, and current official easyJet origin align. If several confirmations qualify, the popup shows masked date/fact choices and never selects a booking automatically.
+
+Choose easyJet's **Find Booking** tab before opening ContextFill. After selecting a masked confirmation, review the in-page trust trace and choose **Transfer 2 verified facts**. ContextFill fills only the visible surname and booking-reference inputs in their shared form, leaves the consent checkbox untouched, never presses **Find Booking**, and offers **Undo**. This path is intended for private user-owned conformance testing, not a claim of general easyJet support or production readiness.
+
 For a real-message test without cloud setup, export one message from Gmail or Outlook as `.eml`, open **Message source → Import email file**, and choose it. The bounded file is parsed locally inside the popup, used once, and never persisted. For ongoing use, ContextFill can connect to Gmail or Outlook through its loopback companion service. Outlook has a guided `contextfill-service --setup outlook` path that prints the exact callback and permissions, then privately saves the public client ID. Creating that registration requires a work/school account with an Entra tenant role or a personal account backed by its own Azure tenant; a standalone Outlook.com account can use the finished multitenant connector but cannot own its registration. Gmail's guided `contextfill-service --setup gmail` path prints its exact callback and imports Google's downloaded web-client JSON directly into owner-only configuration without printing the secret. Tagged releases include both the extension ZIP and an installable `contextfill-companion` package, each with a SHA-256 checksum. See [Real mailbox integration](docs/MAILBOX_INTEGRATION.md) for both paths, least-privilege OAuth setup, current security boundaries, and provider limitations.
 
 ## Architecture
@@ -175,6 +181,8 @@ npm run build           # Production demo, extension, and service builds
 npm run package         # Build extension ZIP and installable companion .tgz
 npm run verify          # Format, lint, types, tests, builds, extension load, browser tests
 ```
+
+The opt-in private Gmail/easyJet conformance spec is excluded from normal verification. It processes real values only in memory, asserts presence rather than value text, immediately undoes the transfer, and never submits. Its current easyJet field contract is also checked independently against the live site before the private run.
 
 The exact verified results are recorded in [Test results](docs/TEST_RESULTS.md).
 

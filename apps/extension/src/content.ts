@@ -1,6 +1,7 @@
 import { fillTransferValue, findContextField } from '../../../packages/core/src/fields/index.js';
 import type { PageContext } from '../../../packages/core/src/types.js';
 import type { ContentRequest, ContentResponse } from './shared/messages.js';
+import { isAllowedEasyJetBookingPage } from './easyjet-policy.js';
 
 function fixtureMeta(name: string): string | null {
   return document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content ?? null;
@@ -12,7 +13,11 @@ function scanPage(): PageContext {
   const simulatedHostname = isLoopback ? fixtureMeta('contextfill-simulated-host') : null;
   return {
     hostname: simulatedHostname ?? window.location.hostname,
-    serviceHint: isLoopback ? fixtureMeta('contextfill-service') : null,
+    serviceHint: isLoopback
+      ? fixtureMeta('contextfill-service')
+      : isAllowedEasyJetBookingPage(window.location.href)
+        ? 'easyJet'
+        : null,
     simulated: Boolean(simulatedHostname),
     scenario: isLoopback ? fixtureMeta('contextfill-scenario') : null,
     fieldKind: target?.kind ?? 'none',
@@ -20,7 +25,7 @@ function scanPage(): PageContext {
   };
 }
 
-function handleRequest(request: ContentRequest): ContentResponse {
+function handleRequest(request: ContentRequest): ContentResponse | null {
   if (request.type === 'SCAN_CONTEXT') {
     return { ok: true, page: scanPage() };
   }
@@ -38,13 +43,15 @@ function handleRequest(request: ContentRequest): ContentResponse {
       ? { ok: true, filled: true }
       : { ok: false, error: 'The value no longer fits the detected field.' };
   }
-  return { ok: false, error: 'Unsupported request.' };
+  return null;
 }
 
 if (!window.__contextfillContentInstalled) {
   window.__contextfillContentInstalled = true;
   chrome.runtime.onMessage.addListener((request: ContentRequest, _sender, sendResponse) => {
-    sendResponse(handleRequest(request));
+    const response = handleRequest(request);
+    if (!response) return false;
+    sendResponse(response);
     return false;
   });
 }

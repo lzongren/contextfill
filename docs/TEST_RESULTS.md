@@ -1,13 +1,13 @@
 # Test results
 
-The integrated `codex/wow-experiment` branch was independently checked on 2026-07-21 in the local macOS workspace after the Capsule commit was cherry-picked. These artifacts are branch evidence only; no new release was published.
+The isolated `codex/easyjet-e2e` branch was checked on 2026-07-21 in the local macOS workspace after the reviewed Capsule commit was integrated. These artifacts are branch evidence only; no new release was published.
 
 | Check                         | Command                                                      | Result                                                                       |
 | ----------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 104 tests passed                         |
-| Unit and integration          | `npm test`                                                   | 19 files, 104 tests passed                                                   |
+| Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 20 files / 111 tests passed                         |
+| Unit and integration          | `npm test`                                                   | 20 files, 111 tests passed                                                   |
 | Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built                                 |
-| Packaged MV3 acceptance       | `npm run test:extension`                                     | 3 Chromium tests passed                                                      |
+| Packaged MV3 acceptance       | `npm run test:extension`                                     | 3 Chromium tests passed; private easyJet conformance skipped by default      |
 | Installed-Chrome acceptance   | `npm run test:browser`                                       | 12 Chrome tests passed                                                       |
 | Full release gate             | `npm run verify`                                             | Passed on the final post-conformance code                                    |
 | Extension and companion build | `npm run package`                                            | Capsule-bearing local artifacts produced                                     |
@@ -17,7 +17,11 @@ The integrated `codex/wow-experiment` branch was independently checked on 2026-0
 | Extension secret-name scan    | `rg` over `dist/extension`                                   | No API-key/OAuth-secret names found                                          |
 | Visual judge-path QA          | In-app browser at 1280×720                                   | Full chain, transfer, no-submit receipt, Undo, and lookalike block inspected |
 
-The packaged-extension acceptance suite proves that a forged page on another path cannot mount the capsule UI even when it copies valid fixture metadata. The allowlisted judge fixture blocks the airline-domain lookalike, then transfers exactly the booking reference and passenger surname on the aligned decoy fixture, leaves hidden/unrelated fields unchanged, reports zero submissions, restores both values with Undo, and keeps replay blocked. Existing packaged coverage still proves inert masked magic-link inspection, explicit same-tab navigation, narrow reference transfer, extension boot, message-source UI, one-time companion pairing, and Gmail/Outlook setup guidance.
+The private easyJet conformance was also run explicitly with a user-owned Gmail OAuth environment and `CONTEXTFILL_LIVE_EASYJET=1`; its single packaged-extension test passed. The read-only companion retrieved bounded easyJet confirmations, the test selected one without logging its subject, surname, or reference, transferred only the two expected values into the current easyJet booking-dialog DOM contract, left consent unchecked, recorded zero submissions, showed the truthful no-submit receipt, cleared both fields with Undo, and kept replay disabled. The Gmail readiness doctor separately confirmed `gmail.readonly`, the exact loopback callback, and private environment-file permissions.
+
+The real page at `https://www.easyjet.com/en?accntmdl=2` was inspected separately in the in-app browser on the same date. It exposed the expected surname input, booking-reference input, consent checkbox, and Find Booking button in one form. No personal values were entered and the form was not submitted. Chrome for Testing received an empty live response from easyJet, so the automated private test routes that exact official URL to a captured current DOM contract; this verifies the packaged extension and real Gmail path without claiming a live network submission.
+
+The packaged-extension acceptance suite proves that a forged page on another path cannot mount the capsule UI even when it copies valid fixture metadata. The allowlisted judge fixture blocks the airline-domain lookalike, then transfers exactly the booking reference and passenger surname on the aligned decoy fixture, leaves hidden/unrelated fields unchanged, reports zero submissions, restores both values with Undo, and keeps replay blocked. The easyJet unit and private conformance coverage additionally rejects lookalike hosts and routes, requires an exact purpose-bound Gmail query, verifies Apple Hide My Email relay encoding, uses masked user selection when multiple bookings match, revalidates policy and the field plan at action time, and never checks consent or submits. Existing packaged coverage still proves inert masked magic-link inspection, explicit same-tab navigation, narrow reference transfer, extension boot, message-source UI, one-time companion pairing, and Gmail/Outlook setup guidance.
 
 The installed-Chrome suite adds the aligned capsule sequence, lookalike block, hidden/unrelated decoys, conflict/stale/nonempty preservation, reduced-motion presentation, exact two-field transfer, no submission, and Undo. It also preserves aligned magic-link context, no navigation during inspection, link lookalike block, trusted reference fill, reference-domain lookalike block, single and split OTP filling, service mismatch, expiry, sender warning, and unrelated-numeric empty state. Unit and integration coverage adds strict capsule schemas, deterministic and model fact extraction, full-value and subject masking, expiry/replay, controlled lookalikes, same-container mapping, zero-size/offscreen and sensitive-field rejection, atomic framework-rewrite rollback, and proof that model facts cannot bypass deterministic authorization, alongside all prior link, MIME, mailbox, schema, fallback, and field-mutation cases.
 
@@ -34,14 +38,14 @@ The automated release gate uses injected provider/model responses and does not m
 ## Packaged extension
 
 - Path: `artifacts/contextfill-extension-v0.2.0-beta.7.zip`
-- Size: 275,222 bytes
-- SHA-256: `affa702d2bf4bd1c8397a380c6f3de3bb33af523f63c34c349bf3f665cac6dd3`
+- Size: 399,242 bytes
+- SHA-256: `04c22b680d0f3762f08e01fbd96e57437ebe388f598d954cb6c888657e0e7fd4`
 - ZIP contents: root-level `manifest.json`, popup HTML/CSS/JS, capsule and general content scripts, and background worker
 - Publication state: isolated branch artifact only; not uploaded or released
 
 ## Packaged companion service
 
 - Path: `artifacts/contextfill-companion-v0.2.0-beta.7.tgz`
-- Size: 895,777 bytes
-- SHA-256: `44538be636426ea89473f16bc1562301e2120e01367ccdd96fe271a021e1dc95`
+- Size: 897,850 bytes
+- SHA-256: `dc8e8f39c026529a68bfdf18142b2d494bf8c7a19c6719c195fbc1cfd558f325`
 - Package contents: executable bundled service, source map, installation guide, environment template, package metadata, and license
