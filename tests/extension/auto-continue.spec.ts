@@ -200,7 +200,7 @@ test('Auto-Continue fills a trusted OTP without the popup action and records no 
   }
 });
 
-test('Auto-Continue opens an aligned magic link in the same tab and blocks the lookalike', async () => {
+test('Auto-Continue opens an aligned magic link in the same tab', async () => {
   const server = await startDemoServer();
   const { context, extensionId } = await extensionContext();
   try {
@@ -214,15 +214,32 @@ test('Auto-Continue opens an aligned magic link in the same tab and blocks the l
     );
     await page.waitForURL('**/?scenario=magic-link-complete', { timeout: 8_000 });
     await expect(page.getByText('Verified handoff completed')).toBeVisible();
+  } finally {
+    await context.close();
+    if (server) await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+  }
+});
 
+test('Auto-Continue blocks a magic-link lookalike before navigation', async () => {
+  const server = await startDemoServer();
+  const { context, extensionId } = await extensionContext();
+  try {
+    const page = await context.newPage();
     await page.goto('http://127.0.0.1:4173/?scenario=magic-link-lookalike');
+    const popup = await openAutomationSettings(context, extensionId, page);
+    await enableAutoContinue(popup);
     await expect(page.locator('#contextfill-auto-continue')).toHaveAttribute(
       'data-state',
       'blocked',
       { timeout: 8_000 },
     );
     await expect(page.getByText('Waiting for your explicit email action')).toBeVisible();
+    await page.waitForTimeout(3_500);
     expect(page.url()).toContain('scenario=magic-link-lookalike');
+
+    const options = await context.newPage();
+    await options.goto(`chrome-extension://${extensionId}/options.html`);
+    await expect(options.locator('.meta').filter({ hasText: 'lookalike' })).toHaveCount(1);
   } finally {
     await context.close();
     if (server) await new Promise<void>((resolveClose) => server.close(() => resolveClose()));

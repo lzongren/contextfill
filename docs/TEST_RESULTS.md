@@ -7,7 +7,7 @@ Release candidate checked on 2026-07-21 in the local macOS workspace.
 | Fast iteration gate           | `npm run check`                                              | Formatting, lint, types, 19 files / 104 tests passed  |
 | Unit and integration          | `npm test`                                                   | 19 files, 104 tests passed                            |
 | Production builds             | `npm run build`                                              | Demo, MV3 extension, and local service built          |
-| Packaged MV3 acceptance       | `npm run test:extension`                                     | 7 Chromium tests passed                               |
+| Packaged MV3 acceptance       | `npm run test:extension`                                     | 8 Chromium tests passed                               |
 | Judge-browser acceptance      | `npm run test:browser`                                       | 7 Chromium tests passed                               |
 | Full release gate             | `npm run verify`                                             | Passed on the final beta.8 candidate                  |
 | Extension and companion build | `npm run package`                                            | Both beta.8 artifacts produced                        |
