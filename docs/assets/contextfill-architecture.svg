@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">ContextFill architecture</title>
+  <desc id="desc">Message sources enter a local loopback companion for bounded extraction. Only schema-validated facts reach the browser extension, where deterministic policy uses the current page and message evidence to authorize visible, revalidated page actions. GPT-5.6 extracts facts but never authorizes. ContextFill never submits.</desc>
+  <defs>
+    <radialGradient id="glow" cx="88%" cy="4%" r="82%">
+      <stop offset="0" stop-color="#c9f27b" stop-opacity="0.5"/>
+      <stop offset="0.48" stop-color="#c9f27b" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#e9ede6" stop-opacity="0"/>
+    </radialGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0L12 6L0 12Z" fill="#7cac2f"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#e9ede6"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+
+  <g transform="translate(88 64)">
+    <rect width="52" height="52" rx="16" fill="#173e35"/>
+    <rect x="13" y="13" width="7" height="27" rx="3.5" fill="#c9f27b"/>
+    <rect x="23" y="13" width="7" height="27" rx="3.5" fill="#c9f27b"/>
+    <rect x="33" y="13" width="7" height="27" rx="3.5" fill="#c9f27b"/>
+    <text x="72" y="37" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="27" font-weight="700">ContextFill architecture</text>
+  </g>
+  <text x="88" y="184" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="59" font-weight="700" letter-spacing="-2">The model extracts facts. Deterministic code decides.</text>
+  <text x="90" y="229" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="23">Mailbox secrets stay outside browser code; every page action remains visible, bounded, and revalidated.</text>
+
+  <g transform="translate(88 284)">
+    <rect width="520" height="420" rx="30" fill="#fffef8" stroke="#bdc8ba" stroke-width="2"/>
+    <text x="32" y="48" fill="#527b14" font-family="SFMono-Regular, Menlo, monospace" font-size="17" font-weight="700" letter-spacing="2">LOCAL LOOPBACK COMPANION · OPTIONAL</text>
+
+    <rect x="32" y="78" width="456" height="86" rx="20" fill="#e2eae0"/>
+    <text x="58" y="113" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="24" font-weight="700">Gmail · Outlook · .eml · demo inbox</text>
+    <text x="58" y="143" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="19">One bounded, recent message</text>
+
+    <path d="M260 164V201" stroke="#7cac2f" stroke-width="5" marker-end="url(#arrow)"/>
+
+    <rect x="32" y="207" width="214" height="120" rx="20" fill="#f1f7e9" stroke="#aeb9ae" stroke-width="2"/>
+    <text x="54" y="242" fill="#527b14" font-family="SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" letter-spacing="1.5">DETERMINISTIC</text>
+    <text x="54" y="277" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="22" font-weight="700">Extraction</text>
+    <text x="54" y="305" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="17">Always available</text>
+
+    <rect x="274" y="207" width="214" height="120" rx="20" fill="#f1f7e9" stroke="#7cac2f" stroke-width="2"/>
+    <text x="296" y="242" fill="#527b14" font-family="SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" letter-spacing="1.5">OPTIONAL GPT-5.6</text>
+    <text x="296" y="277" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="22" font-weight="700">Facts only</text>
+    <text x="296" y="305" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="17">store: false</text>
+
+    <rect x="32" y="350" width="456" height="44" rx="14" fill="#173e35"/>
+    <text x="260" y="379" text-anchor="middle" fill="#fffef8" font-family="SFMono-Regular, Menlo, monospace" font-size="16" font-weight="700" letter-spacing="1.4">STRICT SCHEMA · SOURCE-GROUNDED EVIDENCE</text>
+  </g>
+
+  <path d="M608 494H740" stroke="#7cac2f" stroke-width="6" marker-end="url(#arrow)"/>
+  <rect x="623" y="448" width="110" height="30" rx="15" fill="#e9ede6"/>
+  <text x="678" y="469" text-anchor="middle" fill="#527b14" font-family="SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" letter-spacing="1">FACTS ONLY</text>
+
+  <g transform="translate(760 284)">
+    <rect width="752" height="420" rx="30" fill="#fffef8" stroke="#bdc8ba" stroke-width="2"/>
+    <text x="32" y="48" fill="#527b14" font-family="SFMono-Regular, Menlo, monospace" font-size="17" font-weight="700" letter-spacing="2">MANIFEST V3 EXTENSION + SHARED TYPESCRIPT CORE</text>
+
+    <rect x="32" y="78" width="204" height="88" rx="20" fill="#e2eae0"/>
+    <text x="55" y="113" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="22" font-weight="700">Current page</text>
+    <text x="55" y="143" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="17">Origin · fields · intent</text>
+
+    <path d="M236 122H274" stroke="#7cac2f" stroke-width="5" marker-end="url(#arrow)"/>
+
+    <rect x="278" y="78" width="244" height="88" rx="20" fill="#173e35"/>
+    <text x="400" y="113" text-anchor="middle" fill="#fffef8" font-family="Avenir Next, Arial, sans-serif" font-size="22" font-weight="700">Deterministic policy</text>
+    <text x="400" y="143" text-anchor="middle" fill="#dce5d6" font-family="Avenir Next, Arial, sans-serif" font-size="16">Sender · domain · time · replay</text>
+
+    <path d="M522 122H560" stroke="#7cac2f" stroke-width="5" marker-end="url(#arrow)"/>
+
+    <rect x="564" y="78" width="156" height="88" rx="20" fill="#f1f7e9" stroke="#aeb9ae" stroke-width="2"/>
+    <text x="642" y="113" text-anchor="middle" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="21" font-weight="700">Visible control</text>
+    <text x="642" y="143" text-anchor="middle" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="16">Manual · Assisted · Auto</text>
+
+    <path d="M376 166V210" stroke="#7cac2f" stroke-width="5" marker-end="url(#arrow)"/>
+
+    <rect x="152" y="216" width="448" height="62" rx="18" fill="#e2eae0" stroke="#bdc8ba" stroke-width="2"/>
+    <text x="376" y="255" text-anchor="middle" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="22" font-weight="700">Action-time revalidation</text>
+
+    <path d="M376 278V310H219V326" stroke="#7cac2f" stroke-width="5" fill="none" marker-end="url(#arrow)"/>
+    <path d="M376 310H533V326" stroke="#7cac2f" stroke-width="5" fill="none" marker-end="url(#arrow)"/>
+
+    <rect x="72" y="332" width="294" height="62" rx="18" fill="#f1f7e9" stroke="#aeb9ae" stroke-width="2"/>
+    <text x="219" y="371" text-anchor="middle" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="21" font-weight="700">Fill exact fields</text>
+
+    <rect x="386" y="332" width="294" height="62" rx="18" fill="#f1f7e9" stroke="#aeb9ae" stroke-width="2"/>
+    <text x="533" y="359" text-anchor="middle" fill="#10231f" font-family="Avenir Next, Arial, sans-serif" font-size="21" font-weight="700">Open verified link</text>
+    <text x="533" y="381" text-anchor="middle" fill="#5c6965" font-family="Avenir Next, Arial, sans-serif" font-size="16">Same tab</text>
+  </g>
+
+  <rect x="88" y="755" width="1424" height="76" rx="24" fill="#173e35"/>
+  <text x="800" y="785" text-anchor="middle" fill="#c9f27b" font-family="SFMono-Regular, Menlo, monospace" font-size="17" font-weight="700" letter-spacing="1.6">SECURITY BOUNDARY</text>
+  <text x="800" y="814" text-anchor="middle" fill="#fffef8" font-family="Avenir Next, Arial, sans-serif" font-size="22" font-weight="600">No API key in browser code · no prefetch · no clipboard · no stored temporary values · never submits</text>
+</svg>
